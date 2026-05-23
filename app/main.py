@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 
+from app.api.v1.router import router as v1_router
 from app.core.db import Base, engine
 
 app = FastAPI(
-    title="My Super API",
-    description="A modern, high-performance API built with FastAPI.",
+    title="backend api",
+    description="backend api",
     version="1.0.0",
     contact={
-        "name": "API Support",
+        "name": "support",
         "url": "http://example.com/contact",
         "email": "support@example.com",
     },
@@ -20,6 +21,8 @@ app = FastAPI(
 )
 
 Base.metadata.create_all(bind=engine)
+
+app.include_router(v1_router, prefix="/api/v1")
 
 
 @app.get("/")
