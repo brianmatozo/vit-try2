@@ -1,6 +1,5 @@
 from fastapi.testclient import TestClient
 
-from app.models.users import User
 from app.schemas.users import UserResponse
 
 
@@ -21,8 +20,8 @@ class TestListUsers:
         assert resp.json() == []
 
     def test_returns_all_users(self, client: TestClient):
-        _create_user_via_api(client, "alice", "pw1")
-        _create_user_via_api(client, "bob", "pw2")
+        _create_user_via_api(client, "alice", "secure123")
+        _create_user_via_api(client, "bob", "secure456")
 
         resp = client.get("/api/v1/users/")
 
@@ -46,7 +45,7 @@ class TestListUsers:
 
 class TestGetUser:
     def test_existing_user_returns_200(self, client: TestClient):
-        created = _create_user_via_api(client, "alice", "pw")
+        created = _create_user_via_api(client, "alice", "secure123")
 
         resp = client.get(f"/api/v1/users/{created.id}")
 
@@ -77,7 +76,7 @@ class TestGetUser:
 class TestCreateUser:
     def test_valid_input_returns_201(self, client: TestClient):
         resp = client.post(
-            "/api/v1/users/", json={"username": "alice", "password": "secret"}
+            "/api/v1/users/", json={"username": "alice", "password": "secure123"}
         )
 
         assert resp.status_code == 201
@@ -102,7 +101,7 @@ class TestCreateUser:
     def test_extra_fields_are_ignored(self, client: TestClient):
         resp = client.post(
             "/api/v1/users/",
-            json={"username": "alice", "password": "secret", "is_admin": True},
+            json={"username": "alice", "password": "secure123", "is_admin": True},
         )
         assert resp.status_code == 201
         data = resp.json()
@@ -120,13 +119,15 @@ class TestCreateUser:
         )
         assert resp.status_code == 422
 
-    def test_empty_string_username_returns_201(self, client: TestClient):
-        resp = client.post("/api/v1/users/", json={"username": "", "password": "pw"})
-        assert resp.status_code == 201
+    def test_empty_string_username_returns_422(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/users/", json={"username": "", "password": "secure123"}
+        )
+        assert resp.status_code == 422
 
-    def test_empty_string_password_returns_201(self, client: TestClient):
+    def test_empty_string_password_returns_422(self, client: TestClient):
         resp = client.post("/api/v1/users/", json={"username": "alice", "password": ""})
-        assert resp.status_code == 201
+        assert resp.status_code == 422
 
     def test_integer_username_returns_422(self, client: TestClient):
         resp = client.post("/api/v1/users/", json={"username": 123, "password": "pw"})
@@ -141,10 +142,10 @@ class TestCreateUser:
     def test_idempotent_duplicate_usernames(self, client: TestClient):
         # Model has no unique constraint on username, so duplicates are allowed.
         r1 = client.post(
-            "/api/v1/users/", json={"username": "alice", "password": "pw1"}
+            "/api/v1/users/", json={"username": "alice", "password": "secure123"}
         )
         r2 = client.post(
-            "/api/v1/users/", json={"username": "alice", "password": "pw2"}
+            "/api/v1/users/", json={"username": "alice", "password": "secure456"}
         )
         assert r1.status_code == 201
         assert r2.status_code == 201
@@ -152,7 +153,7 @@ class TestCreateUser:
 
 class TestDeleteUser:
     def test_existing_user_returns_204(self, client: TestClient):
-        created = _create_user_via_api(client, "alice", "pw")
+        created = _create_user_via_api(client, "alice", "secure123")
 
         resp = client.delete(f"/api/v1/users/{created.id}")
 
@@ -181,7 +182,7 @@ class TestDeleteUser:
         assert resp.status_code == 422
 
     def test_double_delete_returns_404_on_second(self, client: TestClient):
-        created = _create_user_via_api(client, "alice", "pw")
+        created = _create_user_via_api(client, "alice", "secure123")
 
         r1 = client.delete(f"/api/v1/users/{created.id}")
         assert r1.status_code == 204

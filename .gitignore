@@ -13,3 +13,6 @@ wheels/
 *.db
 
 stuff.md
+rules.md
+.env
+openapi.json

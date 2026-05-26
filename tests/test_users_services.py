@@ -1,3 +1,4 @@
+import pydantic
 import pytest
 from sqlalchemy.orm import Session
 
@@ -50,40 +51,42 @@ class TestGetUser:
 
 class TestCreateUser:
     def test_valid_input_creates_and_returns_user(self, db_session: Session):
-        user_in = UserCreate(username="alice", password="secret")
+        user_in = UserCreate(username="alice", password="secure123")
 
         result = create_user(db_session, user_in)
 
         assert result.id is not None
         assert result.username == "alice"
-        assert result.hashed_pass == "secret"
+        assert result.hashed_pass == "secure123"
 
         persisted = db_session.get(User, result.id)
         assert persisted is not None
         assert persisted.username == "alice"
 
     def test_duplicate_username_does_not_raise_error(self, db_session: Session):
-        create_user(db_session, UserCreate(username="alice", password="s1"))
+        create_user(db_session, UserCreate(username="alice", password="secure123"))
         # No unique constraint on username in the model, so this should succeed.
-        result = create_user(db_session, UserCreate(username="alice", password="s2"))
+        result = create_user(
+            db_session, UserCreate(username="alice", password="secure456")
+        )
         assert result.id is not None
 
-    def test_empty_username_succeeds(self, db_session: Session):
-        result = create_user(db_session, UserCreate(username="", password="pw"))
-        assert result.username == ""
+    def test_empty_username_fails_validation(self, db_session: Session):
+        with pytest.raises(pydantic.ValidationError, match="username"):
+            UserCreate(username="", password="secure123")
 
-    def test_empty_password_succeeds(self, db_session: Session):
-        result = create_user(db_session, UserCreate(username="alice", password=""))
-        assert result.hashed_pass == ""
+    def test_empty_password_fails_validation(self, db_session: Session):
+        with pytest.raises(pydantic.ValidationError, match="password"):
+            UserCreate(username="alice", password="")
 
-    def test_long_strings_succeed(self, db_session: Session):
-        long_name = "a" * 200
-        long_pass = "b" * 200
+    def test_max_boundary_strings_succeed(self, db_session: Session):
+        max_name = "a" * 50
+        max_pass = "b" * 128
         result = create_user(
-            db_session, UserCreate(username=long_name, password=long_pass)
+            db_session, UserCreate(username=max_name, password=max_pass)
         )
-        assert result.username == long_name
-        assert result.hashed_pass == long_pass
+        assert result.username == max_name
+        assert result.hashed_pass == max_pass
 
 
 class TestDeleteUser:
