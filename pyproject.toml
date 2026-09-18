@@ -5,17 +5,13 @@ description = "python backend for ecommerce"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi[standard]>=0.136.1",
-    "psycopg>=3.3.4",
-    "sqlalchemy>=2.0.49",
+  "fastapi[standard]>=0.136.1",
+  "psycopg>=3.3.4",
+  "sqlalchemy>=2.0.49",
 ]
 
 [dependency-groups]
-dev = [
-    "mypy>=2.1.0",
-    "pytest>=9.0.3",
-    "ruff>=0.15.14",
-]
+dev = ["mypy>=2.1.0", "pytest>=9.0.3", "ruff>=0.15.14"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -26,3 +22,7 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.ty.src]
+include = ["server", "scripts", "tests"]
+exclude = ["apps/"]

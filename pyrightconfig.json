@@ -1,0 +1,15 @@
+{
+  // "extraPaths": ["app"],
+  // "include": [
+  //   "app"
+  // ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "apps"
+  ],
+  // "venvPath": "backend",
+  // "venv": ".venv",
+  // "reportImportCycles": false,
+  // "reportCallInDefaultInitializer": false
+}

@@ -2,9 +2,9 @@ import pydantic
 import pytest
 from sqlalchemy.orm import Session
 
-from app.models.users import User
-from app.schemas.users import UserCreate
-from app.services.users_services import create_user, delete_user, get_user, get_users
+from server.models.users import User
+from server.schemas.users import UserCreate
+from server.services.users_services import create_user, delete_user, get_user, get_users
 
 
 class TestGetUsers:

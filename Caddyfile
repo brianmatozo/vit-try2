@@ -1,0 +1,24 @@
+# For local network hosting with automatic local HTTPS
+# Access via https://localhost or https://<your-local-ip>
+
+{
+    # Enable internal certificate authority for local development / local network
+    local_certs
+}
+
+:443 {
+    # Hashed asset bundles — immutable, 1 year
+    @assets path */assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    # Self-hosted fonts — long cache
+    @fonts path */fonts/*
+    header @fonts Cache-Control "public, max-age=31536000, immutable"
+
+    # Reverse proxy all requests to the FastAPI application
+    # Note: FastAPI handles the SPA fallback (try_files equivalent) and serves the static files.
+    reverse_proxy app:8000
+
+    # Enable compression: Brotli (pre-compressed .br files) > gzip > zstd
+    encode br gzip zstd
+}

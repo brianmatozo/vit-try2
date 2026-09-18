@@ -3,10 +3,10 @@ from typing import Sequence
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db
-from app.models.users import User
-from app.schemas.users import UserCreate, UserResponse
-from app.services import users_services as service
+from server.core.dependencies import get_db
+from server.models.users import User
+from server.schemas.users import UserCreate, UserResponse
+from server.services import users_services as service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from app.api.v1.router import router as v1_router
-from app.core.db import Base, engine
+from server.api.v1.router import router as v1_router
+from server.core.db import Base, engine
 
 _tags_metadata: list[dict[str, str]] = [
     {

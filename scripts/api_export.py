@@ -6,7 +6,7 @@ from pathlib import Path
 # Ensure the project root is on sys.path so we can import `app`
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.main import app
+from server.main import app
 
 # Export OpenAPI schema to dev/openapi.json
 # output_path = Path(__file__).resolve().parent[2] / "openapi.json"

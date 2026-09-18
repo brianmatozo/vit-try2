@@ -3,8 +3,8 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.users import User
-from app.schemas.users import UserCreate
+from server.models.users import User
+from server.schemas.users import UserCreate
 
 
 def _user_select():

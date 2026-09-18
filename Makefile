@@ -1,7 +1,7 @@
 .PHONY: dev lint format fix test check openapi
 
 dev:
-	uv run uvicorn app.main:app --reload
+	uv run uvicorn server.main:app --reload
 
 lint:
 	uv run ruff check .
