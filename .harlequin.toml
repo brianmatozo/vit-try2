@@ -1,0 +1,5 @@
+default_profile = "dev"
+
+[profiles.dev]
+adapter = "postgres"
+conn_str = ["${DATABASE_URL}"]

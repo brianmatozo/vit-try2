@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.schemas.users import UserResponse
+from server.schemas.users import UserResponse
 
 
 def _create_user_via_api(

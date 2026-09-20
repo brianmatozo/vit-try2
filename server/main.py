@@ -1,7 +1,11 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
+import server.models  # noqa: F401
 from server.api.v1.router import router as v1_router
-from server.core.db import Base, engine
+from server.core.db import Base, async_engine, engine
 
 _tags_metadata: list[dict[str, str]] = [
     {
@@ -9,6 +13,16 @@ _tags_metadata: list[dict[str, str]] = [
         "description": "Create, read, update, and delete user accounts.",
     },
 ]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan managing database setup and connection cleanup."""
+    Base.metadata.create_all(bind=engine)
+    yield
+    await async_engine.dispose()
+    engine.dispose()
+
 
 app = FastAPI(
     title="Vitalcer API",
@@ -29,8 +43,6 @@ app = FastAPI(
     openapi_tags=_tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
-
-Base.metadata.create_all(bind=engine)
-
 app.include_router(v1_router, prefix="/api")

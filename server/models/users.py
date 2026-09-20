@@ -1,18 +1,20 @@
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
-
-from server.core.db import Base
+from sqlmodel import Field, SQLModel
 
 
-class User(Base):
+class User(SQLModel, table=True):
     """Database model representing a registered user."""
 
     __tablename__ = "users"
 
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, comment="Unique user identifier"
+    id: int | None = Field(
+        default=None,
+        primary_key=True,
+        description="Unique user identifier",
     )
-    username: Mapped[str] = mapped_column(
-        String, index=True, comment="Unique username chosen by the user"
+    username: str = Field(
+        index=True,
+        description="Unique username chosen by the user",
     )
-    hashed_pass: Mapped[str] = mapped_column(String, comment="BCrypt-hashed password")
+    hashed_pass: str = Field(
+        description="BCrypt-hashed password",
+    )
