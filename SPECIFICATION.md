@@ -34,14 +34,14 @@ flowchart TD
         ADMIN["Admin & Stock Dashboard\n(apps/admin)\nAnalytics & Inventory"]
     end
 
-    subgraph Hardware["In-Store Hardware"]
+    subgraph Hardware["In-Store Hardware & Devices"]
         SCALE["Label Scale\n(Prints EAN-13 Barcode)"]
-
-<!-- HERE IT SHOULD BE A PHONE CAMERA BARCODE SCANNER -->
-
         SCANNER["USB/Bluetooth Barcode Scanner\n(Emulates Keyboard HID)"]
+        CAMERA["Phone / Tablet Camera Scanner\n(@zxing/browser with TRY_HARDER)"]
         SCALE -.->|Print Ticket| SCANNER
+        SCALE -.->|Print Ticket| CAMERA
         SCANNER -->|Keystrokes| POS
+        CAMERA -->|Decoded Event| POS
     end
 
     subgraph Backend["Modular Monolith Backend (FastAPI + Python 3.14)"]
@@ -108,84 +108,41 @@ To eliminate floating-point rounding errors and unit mismatches, all items are s
 * **Discrete Products (`is_bulk = false`)**: Canonical unit is **individual items (`unit`)**. Stock quantity is an integer representing packaging count.
 * **Currency**: Prices are stored as **integers in whole Argentine Pesos (ARS)** (e.g., $1,500 ARS = `1500`). Cents/centavos are strictly omitted as they are obsolete in Argentine retail and commerce.
 
-### 3.2 Product Schema Definition (SQLModel)
+### 3.2 Product Schema Definition
 
-```python
-<!-- wouldnt it be better to just look into the product.py file in /models? -->
-from enum import Enum
-from typing import Optional
-from sqlmodel import SQLModel, Field
-from datetime import datetime
+The canonical definition lives in [`server/models/products.py`](server/models/products.py). High-level entity attributes and invariants:
 
-
-class ProductType(str, Enum):
-    DISCRETE = "discrete"  # Sold by unit (box of cookies, tea)
-    BULK = "bulk"  # Sold by weight (almonds, chia seeds)
-
-
-class Product(SQLModel, table=True):
-    __tablename__ = "products"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    sku: str = Field(
-        unique=True, index=True
-    )  # E.g. "COOKIE-OREO-120G" or "NUT-ALMOND-PEL"
-    plu_code: Optional[str] = Field(
-        default=None, index=True
-    )  # 4-digit scale code, e.g. "0142"
-    name: str = Field(index=True)
-    product_type: ProductType = Field(default=ProductType.DISCRETE)
-
-    # Pricing (stored in integer whole ARS, no centavos)
-    # If discrete: price per single unit
-    # If bulk: price per reference weight (e.g. 100 grams)
-    unit_price: int
-    bulk_reference_grams: int = Field(default=100)  # Usually 100g in dietéticas
-
-    # Inventory state (current calculated balance)
-    current_stock: int = Field(default=0)  # Units or Grams
-    reserved_stock: int = Field(default=0)  # Held by pending delivery orders
-    min_safety_buffer: int = Field(default=0)  # Buffer to withhold from delivery sync
-
-    # External Channel Flags
-    is_active: bool = Field(default=True)
-    sync_pedidosya: bool = Field(default=True)
-    sync_rappi: bool = Field(default=True)
-    sync_vgo: bool = Field(default=True)
-    sync_mercadolibre: bool = Field(default=False)
-
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-```
+| Field | Type | Invariant & Purpose |
+| :--- | :--- | :--- |
+| `id` | `int?` (PK) | Auto-incrementing primary key. |
+| `sku` | `str` (Unique, Index) | Canonical alphanumeric identifier (e.g. `COOKIE-OREO-120G`, `NUT-ALMOND-PEL`). |
+| `plu_code` | `str?` (Index) | 4-digit scale PLU code (e.g. `0142`) for bulk goods. |
+| `name` | `str` (Index) | Human-readable product name. |
+| `product_type` | `ProductType` | `DISCRETE` (sold per unit) or `BULK` (sold per gram). |
+| `unit_price` | `int` | Whole ARS price per unit (discrete) or per reference weight (bulk). Strictly no centavos. |
+| `bulk_reference_grams` | `int` | Reference weight (default `100`g) for bulk unit pricing. |
+| `current_stock` | `int` | Snapshot of calculated current balance (units or grams). |
+| `reserved_stock` | `int` | Units/grams reserved by pending online delivery orders. |
+| `min_safety_buffer` | `int` | Safety buffer withheld from external delivery platform publishing. |
+| `sync_*` | `bool` | Channel sync flags (`sync_pedidosya`, `sync_rappi`, `sync_vgo`, `sync_mercadolibre`). |
+| `created_at` / `updated_at` | `datetime` | UTC timestamps. |
 
 ### 3.3 The Double-Entry Inventory Ledger
 
-Stock is **never** directly overwritten with an `UPDATE products SET current_stock = 50`. Every inventory change is an append-only ledger transaction, preserving a complete audit trail:
+Stock is **never** directly overwritten with an `UPDATE products SET current_stock = 50`. Every inventory change is an append-only ledger transaction, preserving a complete audit trail.
 
-```python
-wouldnt it be better to just see the schema definitions
-class InventoryMovementType(str, Enum):
-    SALE_POS = "sale_pos"  # In-store checkout
-    DELIVERY_FULFILLED = "delivery_fulfilled"  # Delivery picked and dispatched
-    SUPPLIER_RECEIVING = "receiving"  # Stock replenishment
-    SHRINKAGE_MERMA = "shrinkage_merma"  # Spills, moisture loss, discard
-    MANUAL_ADJUSTMENT = "manual_adjustment"  # Physical audit reconciliation
+The canonical definition lives in [`server/models/inventory_ledger.py`](server/models/inventory_ledger.py). High-level entity attributes:
 
-
-class InventoryLedger(SQLModel, table=True):
-    __tablename__ = "inventory_ledger"
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(foreign_key="products.id", index=True)
-    movement_type: InventoryMovementType
-    quantity_delta: int  # Negative for sales/merma, positive for receiving
-    balance_after: int  # Running balance at moment of transaction
-    reference_id: Optional[str] = Field(
-        default=None
-    )  # E.g., POS ticket #, Delivery order #
-    notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-```
+| Field | Type | Invariant & Purpose |
+| :--- | :--- | :--- |
+| `id` | `int?` (PK) | Auto-incrementing primary key. |
+| `product_id` | `int` (FK, Index) | Foreign key pointing to `products.id`. |
+| `movement_type` | `InventoryMovementType` | `SALE_POS`, `DELIVERY_FULFILLED`, `SUPPLIER_RECEIVING`, `SHRINKAGE_MERMA`, `MANUAL_ADJUSTMENT`. |
+| `quantity_delta` | `int` | Signed integer: negative for sales/merma/dispatches, positive for receiving/reversals. |
+| `balance_after` | `int` | Audit running balance at the exact moment of transaction commit. |
+| `reference_id` | `str?` | External or internal reference (POS receipt #, delivery order UUID, PO #). |
+| `notes` | `str?` | Optional human-readable rationale (e.g. "Spill on shelf 2", "Arqueo adjustment"). |
+| `created_at` | `datetime` | Immutable UTC transaction timestamp. |
 
 ---
 
@@ -260,6 +217,15 @@ export function parseBarcode(raw: string): ParsedBarcode {
 4. If `isEmbeddedWeight == false`:
    * Looks up product by `sku`.
    * Adds 1 discrete unit to cart.
+
+### 4.3 Phone & Tablet Camera Scanning (ZXing with `TRY_HARDER`)
+
+For mobile store operations, inventory spot-checks, and mobile checkout assistance without a tethered USB scanner, the web applications support camera-based barcode and QR code reading:
+
+* **Engine**: Powered by `@zxing/browser` (`BrowserMultiFormatReader`) and `@zxing/library`.
+* **Decoder Configuration**: Initialized with `DecodeHintType.TRY_HARDER: true` to reliably decode crumpled, curved, low-contrast, or partially covered label scale printouts on transparent bags.
+* **Supported Formats**: `BarcodeFormat.EAN_13`, `BarcodeFormat.QR_CODE`, `BarcodeFormat.CODE_128`.
+* **Stream Handling**: Direct video feed using `navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })`. Decoded text is piped seamlessly into the exact same `parseBarcode()` pipeline as hardware HID scans.
 
 ---
 
@@ -550,7 +516,10 @@ The cashier application (`apps/pos`) is designed specifically for high-speed ret
 1. **Global Keyboard Barcode Scanner Listener (HID Trap)**:
    * Captures rapid keystrokes from USB/Bluetooth scanners regardless of what element currently has DOM focus.
    * Parses EAN-13 embedded weight and standard discrete barcodes locally in `0ms` against the TanStack Query in-memory catalog cache.
-2. **Keyboard-First Hotkeys**:
+2. **Phone & Tablet Camera Barcode Scanner (ZXing)**:
+   * Integrated viewfinder using `@zxing/browser` configured with `DecodeHintType.TRY_HARDER: true`.
+   * Enables hands-on cashiering on tablets and mobile barcode scanning without specialized hardware.
+3. **Keyboard-First Hotkeys**:
    * `F1` or `/`: Open product quick-search drawer (virtualized with `@tanstack/svelte-virtual`).
    * `F2`: Manual scale weight entry (for items weighed on non-barcode counter scales).
    * `F4`: Clear current cart.
@@ -558,9 +527,9 @@ The cashier application (`apps/pos`) is designed specifically for high-speed ret
    * `F10`: Open payment modal with Card / QR Mercado Pago.
    * `Escape`: Dismiss open modal / cancel prompt.
    * `+` / `-` / `Delete`: Cart line item quantity adjustment.
-3. **Audio Feedback**:
+4. **Audio Feedback**:
    * Web Audio API synthesizer emitting a crisp 880Hz beep on valid scan and a 220Hz low buzzer tone on unknown PLU or validation error.
-4. **Cart Line Item Presentation**:
+5. **Cart Line Item Presentation**:
    * Distinct visual differentiation between **Discrete items** (e.g., `Alfajor Choco (x2) — $3.000`) and **Continuous bulk items** (e.g., `Almendras Nonpareil (350 g @ $1.500 / 100g) — $5.250`). All subtotals and totals are formatted as integers in whole ARS.
 
 ### 7.6 Admin Backoffice & Operations
@@ -606,8 +575,8 @@ Dietetic stores manage mixed cash, card, and app payouts. At the end of every bu
 * [x] Migrate database models to **SQLModel** (`products`, `inventory_ledger`, `users`) with integer whole ARS pricing.
 * [x] Configure **FastCRUD** for standard CRUD endpoints.
 * [x] Implement EAN-13 Embedded Weight Barcode parser utility in backend.
-* [ ] Scaffold pnpm monorepo packages (`packages/api`, `packages/ui`, `packages/core`).
-* [ ] Configure **`@hey-api/openapi-ts`** pipeline in `packages/api` with **TanStack Query** and **Zod** plugins.
+* [x] Scaffold pnpm monorepo packages (`packages/api`, `packages/ui`, `packages/core`).
+* [x] Configure **`@hey-api/openapi-ts`** pipeline in `packages/api` with **TanStack Query** and **Zod** plugins.
 * [ ] Scaffold separated static SvelteKit SPAs (`apps/pos` and `apps/admin`) with Tailwind CSS and Bits UI / shadcn-svelte.
 
 ### Phase 2: POS Cashier Application

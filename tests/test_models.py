@@ -109,10 +109,12 @@ class TestInventoryLedgerModel:
         db_session.add(product)
         db_session.commit()
         db_session.refresh(product)
+        assert product.id is not None
+        prod_id = product.id
 
         # 1. Supplier receiving (stock replenishment)
         entry_receiving = InventoryLedger(
-            product_id=product.id,
+            product_id=prod_id,
             movement_type=InventoryMovementType.SUPPLIER_RECEIVING,
             quantity_delta=10000,  # +10,000 grams
             balance_after=10000,
@@ -123,7 +125,7 @@ class TestInventoryLedgerModel:
 
         # 2. In-store POS sale
         entry_sale = InventoryLedger(
-            product_id=product.id,
+            product_id=prod_id,
             movement_type=InventoryMovementType.SALE_POS,
             quantity_delta=-350,  # -350 grams
             balance_after=9650,
@@ -133,7 +135,7 @@ class TestInventoryLedgerModel:
 
         # 3. Shrinkage / Merma
         entry_merma = InventoryLedger(
-            product_id=product.id,
+            product_id=prod_id,
             movement_type=InventoryMovementType.SHRINKAGE_MERMA,
             quantity_delta=-50,  # -50 grams spilled
             balance_after=9600,
@@ -143,7 +145,7 @@ class TestInventoryLedgerModel:
 
         # 4. Delivery fulfilled
         entry_delivery = InventoryLedger(
-            product_id=product.id,
+            product_id=prod_id,
             movement_type=InventoryMovementType.DELIVERY_FULFILLED,
             quantity_delta=-500,  # -500 grams dispatched
             balance_after=9100,
@@ -153,7 +155,7 @@ class TestInventoryLedgerModel:
 
         # 5. Manual adjustment
         entry_adj = InventoryLedger(
-            product_id=product.id,
+            product_id=prod_id,
             movement_type=InventoryMovementType.MANUAL_ADJUSTMENT,
             quantity_delta=-100,
             balance_after=9000,

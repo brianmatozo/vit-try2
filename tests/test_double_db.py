@@ -111,8 +111,12 @@ class TestPostgresCompatibility:
     def test_postgres_ddl_generation(self):
         """Ensure all SQLModel models produce valid PostgreSQL DDL without errors."""
         dialect = postgresql.dialect()
-        user_ddl = str(CreateTable(User.__table__).compile(dialect=dialect))
-        product_ddl = str(CreateTable(Product.__table__).compile(dialect=dialect))
+        user_ddl = str(
+            CreateTable(User.metadata.tables["users"]).compile(dialect=dialect)
+        )
+        product_ddl = str(
+            CreateTable(Product.metadata.tables["products"]).compile(dialect=dialect)
+        )
 
         assert "CREATE TABLE users" in user_ddl
         assert "SERIAL" in user_ddl

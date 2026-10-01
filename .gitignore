@@ -704,7 +704,6 @@ man/
 manual/
 obj/
 out/
-packages/
 pkg/
 test-output/
 

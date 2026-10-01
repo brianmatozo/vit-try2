@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import ConfigDict, computed_field
+from pydantic import computed_field
 from sqlmodel import Field, SQLModel
 
 from server.models.products import ProductType
@@ -63,8 +63,6 @@ class ProductUpdate(SQLModel):
 
 
 class ProductResponse(ProductBase):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     current_stock: int
     reserved_stock: int

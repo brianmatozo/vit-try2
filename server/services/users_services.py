@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from server.models.users import User
@@ -35,5 +35,8 @@ def create_user(db: Session, user_in: UserCreate) -> User:
 
 
 def delete_user(db: Session, user: User) -> None:
+    state = inspect(user)
+    if state is not None and getattr(state, "was_deleted", False):
+        return
     db.delete(user)
     db.commit()

@@ -9,9 +9,11 @@
 		"ignoreUnknown": false,
 		"includes": [
 			"**",
-			"!**/build/**",
-			"!**/.svelte-kit/**",
-			"!**/node_modules/**"
+			"!**/build",
+			"!**/.svelte-kit",
+			"!**/node_modules",
+			"!**/generated",
+			"!**/packages/api/src/generated"
 		]
 	},
 	"formatter": {
@@ -27,6 +29,17 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "single"
+		}
+	},
+	"json": {
+		"parser": {
+			"allowComments": true,
+			"allowTrailingCommas": true
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	},
 	"assist": {

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from fastapi.testclient import TestClient
 from sqlalchemy import event
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from server.models.inventory_ledger import InventoryLedger, InventoryMovementType
 from server.models.products import Product, ProductType
@@ -24,11 +24,13 @@ class TestNPlusOneQueries:
             db_session.add(prod)
             db_session.commit()
             db_session.refresh(prod)
+            assert prod.id is not None
+            prod_id = prod.id
 
             for j in range(3):
                 db_session.add(
                     InventoryLedger(
-                        product_id=prod.id,
+                        product_id=prod_id,
                         movement_type=InventoryMovementType.SUPPLIER_RECEIVING,
                         quantity_delta=1000 * (j + 1),
                         balance_after=1000 * (j + 1),
@@ -74,11 +76,13 @@ class TestNPlusOneQueries:
         p2 = Product(sku="N1-P2", name="Product 2", unit_price=800)
         db_session.add_all([p1, p2])
         db_session.commit()
+        assert p1.id is not None and p2.id is not None
+        id1, id2 = p1.id, p2.id
 
         for _ in range(5):
             db_session.add(
                 InventoryLedger(
-                    product_id=p1.id,
+                    product_id=id1,
                     movement_type=InventoryMovementType.SALE_POS,
                     quantity_delta=-10,
                     balance_after=490,
@@ -86,14 +90,13 @@ class TestNPlusOneQueries:
             )
             db_session.add(
                 InventoryLedger(
-                    product_id=p2.id,
+                    product_id=id2,
                     movement_type=InventoryMovementType.SALE_POS,
                     quantity_delta=-20,
                     balance_after=780,
                 )
             )
         db_session.commit()
-        id1, id2 = p1.id, p2.id
         db_session.expire_all()
 
         queries: list[str] = []
@@ -107,7 +110,7 @@ class TestNPlusOneQueries:
         try:
             stmt = (
                 select(InventoryLedger)
-                .where(InventoryLedger.product_id.in_([id1, id2]))
+                .where(col(InventoryLedger.product_id).in_([id1, id2]))
                 .limit(10)
             )
             entries = db_session.scalars(stmt).all()

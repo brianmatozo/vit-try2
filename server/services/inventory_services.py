@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from server.models.inventory_ledger import InventoryLedger, InventoryMovementType
 from server.models.products import Product
@@ -39,7 +39,7 @@ async def receive_stock(
     product.current_stock += req.quantity
 
     ledger_entry = InventoryLedger(
-        product_id=product.id,
+        product_id=req.product_id,
         movement_type=InventoryMovementType.SUPPLIER_RECEIVING,
         quantity_delta=req.quantity,
         balance_after=product.current_stock,
@@ -65,7 +65,7 @@ async def log_merma(db: AsyncSession, req: ShrinkageMermaRequest) -> InventoryLe
     product.current_stock -= req.quantity
 
     ledger_entry = InventoryLedger(
-        product_id=product.id,
+        product_id=req.product_id,
         movement_type=InventoryMovementType.SHRINKAGE_MERMA,
         quantity_delta=-req.quantity,
         balance_after=product.current_stock,
@@ -88,7 +88,7 @@ async def adjust_stock(
     product.current_stock = req.counted_stock
 
     ledger_entry = InventoryLedger(
-        product_id=product.id,
+        product_id=req.product_id,
         movement_type=InventoryMovementType.MANUAL_ADJUSTMENT,
         quantity_delta=delta,
         balance_after=product.current_stock,
@@ -138,7 +138,7 @@ async def fulfill_order(db: AsyncSession, req: StockFulfillRequest) -> Inventory
     product.current_stock = max(0, product.current_stock - req.quantity)
 
     ledger_entry = InventoryLedger(
-        product_id=product.id,
+        product_id=req.product_id,
         movement_type=InventoryMovementType.DELIVERY_FULFILLED,
         quantity_delta=-req.quantity,
         balance_after=product.current_stock,
@@ -164,7 +164,7 @@ async def record_pos_sale(db: AsyncSession, req: POSSaleRequest) -> InventoryLed
     product.current_stock -= req.quantity
 
     ledger_entry = InventoryLedger(
-        product_id=product.id,
+        product_id=req.product_id,
         movement_type=InventoryMovementType.SALE_POS,
         quantity_delta=-req.quantity,
         balance_after=product.current_stock,
@@ -182,7 +182,7 @@ async def audit_product_stock(db: AsyncSession, product_id: int) -> StockAuditRe
     product = await _get_locked_product(db, product_id)
 
     sum_stmt = select(func.coalesce(func.sum(InventoryLedger.quantity_delta), 0)).where(
-        InventoryLedger.product_id == product.id
+        InventoryLedger.product_id == product_id
     )
     ledger_balance = (await db.scalars(sum_stmt)).first() or 0
 
@@ -192,7 +192,7 @@ async def audit_product_stock(db: AsyncSession, product_id: int) -> StockAuditRe
     drift = product.current_stock - ledger_balance
 
     return StockAuditResponse(
-        product_id=product.id,
+        product_id=product_id,
         sku=product.sku,
         name=product.name,
         product_type=product.product_type,
@@ -220,6 +220,6 @@ async def get_ledger_history(
     if movement_type is not None:
         stmt = stmt.where(InventoryLedger.movement_type == movement_type)
 
-    stmt = stmt.order_by(InventoryLedger.id.desc()).limit(limit).offset(offset)
+    stmt = stmt.order_by(col(InventoryLedger.id).desc()).limit(limit).offset(offset)
     result = await db.scalars(stmt)
     return result.all()

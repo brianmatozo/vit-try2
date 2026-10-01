@@ -30,6 +30,7 @@ class TestGetUser:
         user = User(username="alice", hashed_pass="h1")
         db_session.add(user)
         db_session.commit()
+        assert user.id is not None
 
         result = get_user(db_session, user.id)
 

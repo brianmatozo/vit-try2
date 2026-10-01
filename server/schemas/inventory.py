@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-from pydantic import ConfigDict
 from sqlmodel import Field, SQLModel
 
 from server.models.inventory_ledger import InventoryMovementType
@@ -87,8 +86,6 @@ class POSSaleRequest(SQLModel):
 
 class InventoryLedgerResponse(SQLModel):
     """Audit log item representing an immutable inventory ledger transaction."""
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: int
     product_id: int
