@@ -12,8 +12,11 @@ wheels/
 # Database files
 *.db
 
-# Node dependencies
+# Node dependencies & frontend build outputs
 node_modules/
+.svelte-kit/
+.output/
+output/
 
 stuff.md
 rules.md

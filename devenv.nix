@@ -7,6 +7,8 @@
     UV_PYTHON_PREFERENCE = "managed";
     # Default database URL for local development (matches docker-compose & postgres service)
     DATABASE_URL = "postgresql://vitalcer:vitalcer@localhost:5432/vitalcer";
+    PGDATABASE = "vitalcer";
+    PGUSER = "vitalcer";
   };
 
   # CLI tools and language servers
@@ -43,7 +45,7 @@
 
   # Devenv helper commands (run directly in shell or with `devenv run <name>`)
   scripts = {
-    dev.exec = "uv run uvicorn server.main:app --reload";
+    dev.exec = "uv run uvicorn server.main:app --reload --host 0.0.0.0";
     lint.exec = "ruff check .";
     fix.exec = "ruff check . --fix && ruff format .";
     format.exec = "ruff format .";
@@ -63,7 +65,9 @@
     openapi.exec = "uv run python scripts/api_export.py";
 
     # Frontend scripts
-    "dev:pos".exec = "pnpm --filter pos dev";
+    "dev:admin".exec = "pnpm --filter admin dev -- --host";
+    "dev:pos".exec = "pnpm --filter pos dev -- --host";
+    "check:admin".exec = "pnpm --filter admin check";
     "check:pos".exec = "pnpm --filter pos check";
     "lint:fe".exec = "biome check .";
     "format:fe".exec = "biome format --write .";
@@ -73,11 +77,11 @@
   processes = {
     server.exec = ''
       echo "Waiting for PostgreSQL to be ready on port 5432..."
-      while ! pg_isready -h 127.0.0.1 -p 5432 -q; do
+      while ! pg_isready -h 127.0.0.1 -p 5432 -d vitalcer -U vitalcer -q; do
         sleep 0.5
       done
       echo "PostgreSQL is ready, starting backend server..."
-      uv run uvicorn server.main:app --reload --host 127.0.0.1 --port 8000
+      uv run uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
     '';
   };
 
@@ -89,6 +93,7 @@
     port = 5432;
     initialDatabases = [
       { name = "vitalcer"; user = "vitalcer"; }
+      { name = "brian"; user = "vitalcer"; }
     ];
     initialScript = ''
       DO $$

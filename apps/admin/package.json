@@ -1,5 +1,5 @@
 {
-	"name": "pos",
+	"name": "admin",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -28,6 +28,7 @@
 	"dependencies": {
 		"@tanstack/svelte-form": "^1.33.5",
 		"@tanstack/svelte-query": "^6.2.1",
+		"@tanstack/svelte-table": "^9.2.4",
 		"@tanstack/svelte-virtual": "^3.13.39",
 		"@vitalcer/api": "workspace:*",
 		"@vitalcer/core": "workspace:*",
@@ -36,6 +37,6 @@
 		"clsx": "^2.1.1",
 		"lucide-svelte": "^1.0.1",
 		"tailwind-merge": "^3.7.0",
-		"zod": "^4.6.5"
+		"zod": "^3.24.2"
 	}
 }

@@ -24,7 +24,9 @@ You have three reliable ways to execute commands:
 1. **Via `make` (Recommended)**:  
    The `Makefile` automatically prepends `.devenv/profile/bin` to `PATH`.
    ```bash
-   make dev         # Run FastAPI backend with hot reload
+   make dev         # Run FastAPI backend with hot reload (host 0.0.0.0)
+   make dev-admin   # Run Admin SPA (host 0.0.0.0)
+   make dev-pos     # Run POS cashier SPA (host 0.0.0.0)
    make lint        # Run ruff check .
    make fix         # Fix lint errors & auto-format
    make format      # Format with ruff

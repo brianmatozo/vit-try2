@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 import server.models  # noqa: F401
 from server.api.v1.router import router as v1_router
-from server.core.db import Base, async_engine, engine
+from server.core.db import Base, async_engine
 
 _tags_metadata: list[dict[str, str]] = [
     {
@@ -18,10 +18,10 @@ _tags_metadata: list[dict[str, str]] = [
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan managing database setup and connection cleanup."""
-    Base.metadata.create_all(bind=engine)
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
     await async_engine.dispose()
-    engine.dispose()
 
 
 app = FastAPI(

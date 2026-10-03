@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, event
@@ -51,7 +53,7 @@ def async_engine(test_db_path: str, sync_engine):
 
 @pytest.fixture
 def db_session(sync_engine: Engine):
-    """Synchronous session fixture for testing sync services and endpoints."""
+    """Synchronous session fixture for testing SQLModel models directly."""
     session_factory = sessionmaker(
         autocommit=False, autoflush=False, bind=sync_engine, class_=Session
     )
@@ -61,7 +63,7 @@ def db_session(sync_engine: Engine):
 
 @pytest.fixture
 async def async_session(async_engine):
-    """Asynchronous session fixture for testing async services and FastCRUD."""
+    """Asynchronous session fixture for testing async services."""
     session_factory = async_sessionmaker(
         async_engine, class_=AsyncSession, expire_on_commit=False
     )
@@ -70,21 +72,29 @@ async def async_session(async_engine):
 
 
 @pytest.fixture
-def client(db_session: Session, async_engine):
-    """TestClient with both get_db and get_async_db dependencies overridden."""
+def client(async_engine):
+    """TestClient with database dependencies overridden for isolated SQLite tests."""
     async_session_factory = async_sessionmaker(
         async_engine, class_=AsyncSession, expire_on_commit=False
     )
-
-    def override_get_db():
-        yield db_session
 
     async def override_get_async_db():
         async with async_session_factory() as session:
             yield session
 
-    app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_async_db] = override_get_async_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = override_get_async_db
+
+    original_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def noop_lifespan(_):
+        yield
+
+    app.router.lifespan_context = noop_lifespan
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.router.lifespan_context = original_lifespan
+        app.dependency_overrides.clear()

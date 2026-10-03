@@ -1,15 +1,18 @@
 export PATH := $(CURDIR)/.devenv/profile/bin:$(PATH)
 
-.PHONY: dev dev-pos db lint format fix test check typecheck openapi
+.PHONY: dev dev-admin dev-pos db lint format fix test check typecheck openapi
 
 db:
 	docker compose up -d postgres
 
 dev:
-	uv run uvicorn server.main:app --reload
+	uv run uvicorn server.main:app --reload --host 0.0.0.0
+
+dev-admin:
+	pnpm --filter admin dev -- --host
 
 dev-pos:
-	pnpm --filter pos dev
+	pnpm --filter pos dev -- --host
 
 lint:
 	ruff check .

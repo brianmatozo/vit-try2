@@ -4,7 +4,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"dev:pos": "pnpm --filter pos dev",
+		"dev:admin": "pnpm --filter admin dev -- --host",
+		"dev:pos": "pnpm --filter pos dev -- --host",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"keywords": [],

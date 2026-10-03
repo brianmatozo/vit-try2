@@ -1,9 +1,9 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.core.dependencies import get_db
+from server.core.dependencies import get_async_db
 from server.models.users import User
 from server.schemas.users import UserCreate, UserResponse
 from server.services import users_services as service
@@ -19,9 +19,9 @@ router = APIRouter(prefix="/users", tags=["Users"])
     response_description="A list of user objects.",
     operation_id="listUsers",
 )
-def list_users(db: Session = Depends(get_db)) -> Sequence[User]:
+async def list_users(db: AsyncSession = Depends(get_async_db)) -> Sequence[User]:
     """Retrieve every registered user."""
-    return service.get_users(db)
+    return await service.get_users(db)
 
 
 @router.get(
@@ -35,9 +35,9 @@ def list_users(db: Session = Depends(get_db)) -> Sequence[User]:
         404: {"description": "No user found with the given ID."},
     },
 )
-def get_user(user_id: int, db: Session = Depends(get_db)) -> User:
+async def get_user(user_id: int, db: AsyncSession = Depends(get_async_db)) -> User:
     """Retrieve one user by primary key."""
-    user = service.get_user(db, user_id)
+    user = await service.get_user(db, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -54,9 +54,11 @@ def get_user(user_id: int, db: Session = Depends(get_db)) -> User:
     response_description="The newly created user object.",
     operation_id="createUser",
 )
-def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
+async def create_user(
+    user_in: UserCreate, db: AsyncSession = Depends(get_async_db)
+) -> User:
     """Register a new user."""
-    return service.create_user(db, user_in)
+    return await service.create_user(db, user_in)
 
 
 @router.delete(
@@ -70,11 +72,11 @@ def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
         404: {"description": "No user found with the given ID."},
     },
 )
-def delete_user(user_id: int, db: Session = Depends(get_db)) -> None:
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_async_db)) -> None:
     """Delete one user by primary key."""
-    user = service.get_user(db, user_id)
+    user = await service.get_user(db, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    service.delete_user(db, user)
+    await service.delete_user(db, user)
