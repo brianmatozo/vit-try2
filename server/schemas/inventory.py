@@ -84,6 +84,22 @@ class POSSaleRequest(SQLModel):
     ticket_reference_id: str = Field(description="POS ticket or transaction ID")
 
 
+class POSSaleItem(SQLModel):
+    """Single line item in a batch POS checkout."""
+
+    product_id: int = Field(description="Target product ID")
+    quantity: int = Field(gt=0, description="Units or grams sold")
+
+
+class POSBatchSaleRequest(SQLModel):
+    """Atomic batch checkout deduction for multi-item POS sales."""
+
+    ticket_reference_id: str = Field(description="POS ticket or receipt ID")
+    items: list[POSSaleItem] = Field(
+        min_length=1, description="List of items sold in this checkout transaction"
+    )
+
+
 class InventoryLedgerResponse(SQLModel):
     """Audit log item representing an immutable inventory ledger transaction."""
 

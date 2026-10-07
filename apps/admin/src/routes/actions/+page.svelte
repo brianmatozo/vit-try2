@@ -34,8 +34,10 @@ const productsQuery = createQuery(() =>
 
 const products = $derived<ProductResponse[]>(
 	productsQuery.data && 'data' in productsQuery.data
-		? productsQuery.data.data
-		: [],
+		? (productsQuery.data.data as ProductResponse[])
+		: Array.isArray(productsQuery.data)
+			? (productsQuery.data as ProductResponse[])
+			: [],
 );
 
 // Success message state
@@ -227,20 +229,20 @@ async function handleAdjustSubmit(e: SubmitEvent) {
 }
 </script>
 
-<div class="space-y-6">
+<div class="space-y-4 sm:space-y-6 min-w-0">
   <!-- Title -->
   <div>
-    <h1 class="text-xl font-bold tracking-tight text-gray-900">Operaciones de Inventario</h1>
-    <p class="text-xs text-gray-500 mt-1">
+    <h1 class="text-lg sm:text-xl font-bold tracking-tight text-gray-900">Operaciones de Inventario</h1>
+    <p class="text-xs text-gray-500 mt-0.5 sm:mt-1">
       Movimientos controlados por la lista general de stock
     </p>
   </div>
 
   <!-- Success Notification -->
   {#if successBanner}
-    <Card class="p-4 bg-emerald-50 border-emerald-200">
+    <Card class="p-3 sm:p-4 bg-emerald-50 border-emerald-200">
       <div class="flex items-start justify-between">
-        <div class="flex items-start gap-3">
+        <div class="flex items-start gap-2.5 sm:gap-3">
           <CheckCircle2 class="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
           <div>
             <h3 class="text-sm font-semibold text-emerald-900">{successBanner.title}</h3>
@@ -255,7 +257,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         <button
           type="button"
           onclick={() => (successBanner = null)}
-          class="text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
+          class="text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer p-1"
         >
           Cerrar
         </button>
@@ -265,9 +267,9 @@ async function handleAdjustSubmit(e: SubmitEvent) {
 
   <!-- Error Notification -->
   {#if errorMessage}
-    <Card class="p-4 bg-rose-50 border-rose-200">
+    <Card class="p-3 sm:p-4 bg-rose-50 border-rose-200">
       <div class="flex items-start justify-between">
-        <div class="flex items-start gap-3">
+        <div class="flex items-start gap-2.5 sm:gap-3">
           <AlertCircle class="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
           <div>
             <h3 class="text-sm font-semibold text-rose-900">Error en la operación</h3>
@@ -277,7 +279,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         <button
           type="button"
           onclick={() => (errorMessage = null)}
-          class="text-xs text-rose-600 hover:text-rose-800 cursor-pointer"
+          class="text-xs text-rose-600 hover:text-rose-800 cursor-pointer p-1"
         >
           Cerrar
         </button>
@@ -286,11 +288,11 @@ async function handleAdjustSubmit(e: SubmitEvent) {
   {/if}
 
   <!-- Action Cards Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-6">
     <!-- 1. Stock Inbound / Receiving -->
-    <Card class="p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
+    <Card class="p-4 sm:p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
       <div>
-        <div class="w-9 h-9 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
+        <div class="w-9 h-9 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 sm:mb-4">
           <PackagePlus class="w-5 h-5" />
         </div>
         <h2 class="text-base font-semibold text-gray-900">Recepción de Proveedor</h2>
@@ -299,9 +301,9 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         </p>
       </div>
 
-      <div class="mt-6 pt-4 border-t border-gray-100">
+      <div class="mt-5 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-100">
         <Button
-          class="w-full justify-center"
+          class="w-full justify-center h-10 sm:h-9"
           onclick={() => {
             errorMessage = null;
             isReceiveOpen = true;
@@ -313,9 +315,9 @@ async function handleAdjustSubmit(e: SubmitEvent) {
     </Card>
 
     <!-- 2. Shrinkage / Merma -->
-    <Card class="p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
+    <Card class="p-4 sm:p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
       <div>
-        <div class="w-9 h-9 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center mb-4">
+        <div class="w-9 h-9 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center mb-3 sm:mb-4">
           <Trash2 class="w-5 h-5" />
         </div>
         <h2 class="text-base font-semibold text-gray-900">Merma / Pérdida</h2>
@@ -324,10 +326,10 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         </p>
       </div>
 
-      <div class="mt-6 pt-4 border-t border-gray-100">
+      <div class="mt-5 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-100">
         <Button
           variant="outline"
-          class="w-full justify-center text-rose-700 hover:bg-rose-50 hover:border-rose-300"
+          class="w-full justify-center text-rose-700 hover:bg-rose-50 hover:border-rose-300 h-10 sm:h-9"
           onclick={() => {
             errorMessage = null;
             isMermaOpen = true;
@@ -339,9 +341,9 @@ async function handleAdjustSubmit(e: SubmitEvent) {
     </Card>
 
     <!-- 3. Manual Audit Adjustment -->
-    <Card class="p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
+    <Card class="p-4 sm:p-5 flex flex-col justify-between hover:border-gray-300 transition-colors">
       <div>
-        <div class="w-9 h-9 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
+        <div class="w-9 h-9 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center mb-3 sm:mb-4">
           <Sliders class="w-5 h-5" />
         </div>
         <h2 class="text-base font-semibold text-gray-900">Ajuste por Auditoría Física</h2>
@@ -350,10 +352,10 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         </p>
       </div>
 
-      <div class="mt-6 pt-4 border-t border-gray-100">
+      <div class="mt-5 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-100">
         <Button
           variant="outline"
-          class="w-full justify-center text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+          class="w-full justify-center text-amber-700 hover:bg-amber-50 hover:border-amber-300 h-10 sm:h-9"
           onclick={() => {
             errorMessage = null;
             isAdjustOpen = true;
@@ -382,7 +384,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
           id="receive-product"
           bind:value={receiveProductId}
           required
-          class="w-full h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-900 shadow-xs focus:outline-none focus:border-emerald-600"
+          class="w-full h-10 sm:h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-base sm:text-sm text-gray-900 shadow-xs focus:outline-none focus:border-emerald-600 truncate"
         >
           <option value="" disabled>Selecciona un artículo...</option>
           {#each products as product (product.id)}
@@ -443,6 +445,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       variant="outline"
       size="sm"
       type="button"
+      class="flex-1 sm:flex-none justify-center"
       onclick={() => (isReceiveOpen = false)}
     >
       Cancelar
@@ -451,6 +454,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       size="sm"
       type="submit"
       form="receiveForm"
+      class="flex-1 sm:flex-none justify-center"
       disabled={receiveMutation.isPending}
     >
       {receiveMutation.isPending ? 'Guardando...' : 'Confirmar Ingreso'}
@@ -474,7 +478,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
           id="merma-product"
           bind:value={mermaProductId}
           required
-          class="w-full h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-900 shadow-xs focus:outline-none focus:border-rose-600"
+          class="w-full h-10 sm:h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-base sm:text-sm text-gray-900 shadow-xs focus:outline-none focus:border-rose-600 truncate"
         >
           <option value="" disabled>Selecciona un artículo...</option>
           {#each products as product (product.id)}
@@ -536,6 +540,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       variant="outline"
       size="sm"
       type="button"
+      class="flex-1 sm:flex-none justify-center"
       onclick={() => (isMermaOpen = false)}
     >
       Cancelar
@@ -545,6 +550,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       variant="destructive"
       type="submit"
       form="mermaForm"
+      class="flex-1 sm:flex-none justify-center"
       disabled={mermaMutation.isPending}
     >
       {mermaMutation.isPending ? 'Guardando...' : 'Asentar Merma'}
@@ -568,7 +574,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
           id="adjust-product"
           bind:value={adjustProductId}
           required
-          class="w-full h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-900 shadow-xs focus:outline-none focus:border-amber-600"
+          class="w-full h-10 sm:h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-base sm:text-sm text-gray-900 shadow-xs focus:outline-none focus:border-amber-600 truncate"
         >
           <option value="" disabled>Selecciona un artículo...</option>
           {#each products as product (product.id)}
@@ -643,6 +649,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       variant="outline"
       size="sm"
       type="button"
+      class="flex-1 sm:flex-none justify-center"
       onclick={() => (isAdjustOpen = false)}
     >
       Cancelar
@@ -651,6 +658,7 @@ async function handleAdjustSubmit(e: SubmitEvent) {
       size="sm"
       type="submit"
       form="adjustForm"
+      class="flex-1 sm:flex-none justify-center"
       disabled={adjustMutation.isPending}
     >
       {adjustMutation.isPending ? 'Guardando...' : 'Aplicar Ajuste'}

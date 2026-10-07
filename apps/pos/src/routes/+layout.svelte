@@ -1,8 +1,15 @@
 <script lang="ts">
 import './layout.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
+import { client } from '@vitalcer/api';
 import { browser } from '$app/environment';
 import favicon from '$lib/assets/favicon.svg';
+
+if (browser) {
+	client.setConfig({
+		baseUrl: import.meta.env.VITE_API_URL || '',
+	});
+}
 
 let { children } = $props();
 

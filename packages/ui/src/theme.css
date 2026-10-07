@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "./";
 
 @theme {
 	--color-primary: #10b981;
@@ -8,4 +9,12 @@
 	--color-accent: #f59e0b;
 	--color-destructive: #ef4444;
 	--color-destructive-foreground: #ffffff;
+}
+
+@utility no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }

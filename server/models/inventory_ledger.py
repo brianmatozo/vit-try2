@@ -25,12 +25,15 @@ class InventoryLedger(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="products.id", index=True)
-    movement_type: InventoryMovementType
+    movement_type: InventoryMovementType = Field(index=True)
     quantity_delta: int  # Negative for sales/merma, positive for receiving
     balance_after: int  # Running balance at moment of transaction
-    reference_id: str | None = Field(default=None)  # POS ticket # or order #
+    # POS ticket # or order #
+    reference_id: str | None = Field(default=None, index=True)
     notes: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc), index=True
+    )
 
     product: Optional["Product"] = Relationship(
         back_populates="ledger_entries",

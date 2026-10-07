@@ -218,14 +218,19 @@ export function parseBarcode(raw: string): ParsedBarcode {
    * Looks up product by `sku`.
    * Adds 1 discrete unit to cart.
 
-### 4.3 Phone & Tablet Camera Scanning (ZXing with `TRY_HARDER`)
+### 4.3 Phone & Tablet Camera Scanning (Native BarcodeDetector + ZXing Fallback)
 
-For mobile store operations, inventory spot-checks, and mobile checkout assistance without a tethered USB scanner, the web applications support camera-based barcode and QR code reading:
+The POS cashier application (`apps/pos`) is designed primarily as a **phone-first mobile web app**, allowing staff to scan barcodes directly using the phone or tablet camera without requiring a physical USB/Bluetooth handheld scanner:
 
-* **Engine**: Powered by `@zxing/browser` (`BrowserMultiFormatReader`) and `@zxing/library`.
-* **Decoder Configuration**: Initialized with `DecodeHintType.TRY_HARDER: true` to reliably decode crumpled, curved, low-contrast, or partially covered label scale printouts on transparent bags.
-* **Supported Formats**: `BarcodeFormat.EAN_13`, `BarcodeFormat.QR_CODE`, `BarcodeFormat.CODE_128`.
-* **Stream Handling**: Direct video feed using `navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })`. Decoded text is piped seamlessly into the exact same `parseBarcode()` pipeline as hardware HID scans.
+* **Dual Detection Engine**:
+  * **Native GPU Accelerated**: Uses the browser's hardware-accelerated `BarcodeDetector` API when available for ultra-fast, zero-overhead decoding.
+  * **Universal Fallback**: Automatically falls back to `@zxing/browser` (`BrowserMultiFormatReader`) for browsers without native support.
+* **Scan Throttling & Feedback**: Throttles duplicate reads within 1.5s to prevent double-charging, triggering an immediate emerald visual flash and Web Audio synthesizer confirmation beep.
+* **Supported Formats**: `EAN_13`, `EAN_8`, `CODE_128`, `CODE_39`, `UPC_A`, `UPC_E`, `QR_CODE`.
+* **Hardware & Stream Handling**:
+  * Direct video feed using `navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } })`.
+  * **HTTPS Mandatory**: Served over HTTPS (`@vitejs/plugin-basic-ssl` on port `5174`) to satisfy the W3C Secure Context requirement for camera permissions over local network / WireGuard VPN.
+  * Built-in torch control (flashlight) and camera switching (rear/front).
 
 ---
 
@@ -574,35 +579,45 @@ Dietetic stores manage mixed cash, card, and app payouts. At the end of every bu
 
 * [x] Migrate database models to **SQLModel** (`products`, `inventory_ledger`, `users`) with integer whole ARS pricing.
 * [x] Configure **FastCRUD** for standard CRUD endpoints.
-* [x] Implement EAN-13 Embedded Weight Barcode parser utility in backend.
+* [x] Implement EAN-13 Embedded Weight Barcode parser utility in backend and `@vitalcer/core`.
 * [x] Scaffold pnpm monorepo packages (`packages/api`, `packages/ui`, `packages/core`).
 * [x] Configure **`@hey-api/openapi-ts`** pipeline in `packages/api` with **TanStack Query** and **Zod** plugins.
-* [ ] Scaffold separated static SvelteKit SPAs (`apps/pos` and `apps/admin`) with Tailwind CSS and Bits UI / shadcn-svelte.
+* [x] Scaffold separated static SvelteKit SPAs (`apps/pos` and `apps/admin`) with Tailwind CSS v4 and Bits UI / shadcn-svelte.
+* [x] Hermetic toolchain configuration via **Nix (`devenv.nix`)** and `Makefile`.
 
-### Phase 2: POS Cashier Application
+### Phase 2: POS Cashier Application (Phone-First)
 
-* [ ] Build Svelte 5 POS cashier layout with global keyboard barcode scanner listener.
-* [ ] Integrate Web Audio API feedback (scan beep & error buzzer).
-* [ ] Integrate TanStack Query for catalog caching and instant offline-tolerant lookups.
-* [ ] Integrate TanStack Virtual for rapid 60 FPS product search drawer.
-* [ ] Implement cart state machine supporting discrete units + weighted grams (in whole ARS).
-* [ ] Implement checkout flow with inventory ledger reduction.
-* [ ] Test with simulated EAN-13 barcodes (`200142003507`).
+* [x] Build Svelte 5 POS cashier layout optimized for mobile screens.
+* [x] Integrate HTTPS support via `@vitejs/plugin-basic-ssl` on port `5174` for mobile camera permissions.
+* [x] Implement Camera Barcode Scanner with native `BarcodeDetector` + `@zxing/browser` fallback, race condition guards, and torch control.
+* [x] Integrate Web Audio API feedback (880Hz confirmation beep & 220Hz error buzzer).
+* [x] Integrate TanStack Query in-memory catalog caching for instant 0ms scanner response.
+* [x] Implement cart state machine in Svelte 5 Runes supporting discrete units + weighted grams (in whole ARS).
+* [x] Implement manual scale weight modal and quick product search modal.
+* [x] Implement checkout modal supporting Cash (with quick bills & change calculation), Card terminal, and QR Mercado Pago.
+* [x] Atomically record sales to the backend double-entry inventory ledger (`/inventory/sale-pos`).
 
 ### Phase 3: Inventory Engine & Merma
 
-* [x] Automated stock calculation & double-entry ledger backend engine (`current_stock`, `reserved_stock`, `merma`, `audit`).
-* [ ] Build stock receiving interface (inbound supplier orders).
-* [ ] Build inventory adjustment & shrinkage (*merma*) logging modal in Admin.
+* [x] Automated stock calculation & double-entry ledger backend engine (`/receive`, `/merma`, `/adjust`, `/reserve`, `/release`, `/fulfill`, `/sale-pos`, `/audit`, `/ledger`).
+* [x] Build stock receiving interface for inbound supplier orders (`apps/admin/src/routes/actions/+page.svelte`).
+* [x] Build inventory adjustment & shrinkage (*merma*) logging interface in Admin.
+* [x] Build immutable audit trail ledger table with movement type filters and pagination (`apps/admin/src/routes/ledger/+page.svelte`).
+* [x] Build product catalog manager with `@tanstack/svelte-virtual` (60 FPS scrolling) and responsive mobile bottom-sheet / desktop dialog.
 
 ### Phase 4: Delivery Integrations & Orchestration
 
-* [ ] Implement `DeliveryAdapter` interface.
-* [ ] Build mock adapter to test incoming orders, reservations, and timeouts.
-* [ ] Build Live Order Picking screen with Conflict & Substitution workflows.
-* [ ] Implement concrete PedidosYa and Rappi adapters.
+* [ ] Define `DeliveryOrder` and `DeliveryOrderItem` SQLModel tables.
+* [ ] Implement `DeliveryAdapter` unified abstract interface (`update_catalog_stock`, `pause_product`, `ingest_order`, `modify_order_item`).
+* [ ] Build Mock Delivery Adapter for end-to-end webhook/order simulation.
+* [ ] Implement virtual stock synchronization ($\text{Virtual Stock} = \max(0, \text{Stock} - \text{Reserved} - \text{Buffer})$).
+* [ ] Build Live Order Picking screen (`apps/admin/src/routes/deliveries`) with acoustic dispatch alerts.
+* [ ] Implement clerk Conflict & Substitution workflow (suggest alternatives, calculate price delta, recalculate subtotal).
+* [ ] Implement concrete PedidosYa, Rappi, and VGO adapters.
 
-### Phase 5: Dashboard & Financial Closing
+### Phase 5: Dashboard & Financial Closing ("Cierre de Caja")
 
-* [ ] Build Cierre de Caja summary screen (Cash, Cards, Delivery platforms).
-* [ ] Daily sales, margin, and shrinkage reports.
+* [ ] Build Daily Closing backend service aggregating Cash, Cards, and Delivery platform receivables.
+* [ ] Build Cierre de Caja summary screen in Admin (`apps/admin/src/routes/closure`).
+* [ ] Implement Arqueo de Caja physical cash discrepancy calculator.
+* [ ] Generate daily sales, margin, and shrinkage reports.

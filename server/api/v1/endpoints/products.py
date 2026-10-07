@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastcrud import crud_router
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 from sqlmodel import select
 
 from server.core.dependencies import get_async_db
@@ -32,7 +33,11 @@ async def scan_barcode(
 ) -> ProductScanResult:
     parsed = parse_barcode(barcode)
     if parsed.is_embedded_weight:
-        stmt = select(Product).where(Product.plu_code == parsed.sku_or_plu)
+        stmt = (
+            select(Product)
+            .options(noload("*"))
+            .where(Product.plu_code == parsed.sku_or_plu)
+        )
         product = (await db.scalars(stmt)).first()
         if not product:
             raise HTTPException(
@@ -49,7 +54,7 @@ async def scan_barcode(
             line_total=line_total,
         )
 
-    stmt = select(Product).where(Product.sku == parsed.sku_or_plu)
+    stmt = select(Product).options(noload("*")).where(Product.sku == parsed.sku_or_plu)
     product = (await db.scalars(stmt)).first()
     if not product:
         raise HTTPException(
@@ -76,7 +81,7 @@ async def get_product_by_plu(
     plu_code: str,
     db: AsyncSession = Depends(get_async_db),
 ) -> ProductResponse:
-    stmt = select(Product).where(Product.plu_code == plu_code)
+    stmt = select(Product).options(noload("*")).where(Product.plu_code == plu_code)
     product = (await db.scalars(stmt)).first()
     if not product:
         raise HTTPException(

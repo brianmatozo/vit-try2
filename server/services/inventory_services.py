@@ -4,11 +4,13 @@ from collections.abc import Sequence
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 from sqlmodel import col, select
 
 from server.models.inventory_ledger import InventoryLedger, InventoryMovementType
 from server.models.products import Product
 from server.schemas.inventory import (
+    POSBatchSaleRequest,
     POSSaleRequest,
     ShrinkageMermaRequest,
     StockAdjustmentRequest,
@@ -21,8 +23,16 @@ from server.schemas.inventory import (
 
 
 async def _get_locked_product(db: AsyncSession, product_id: int) -> Product:
-    """Fetch product with row lock (SELECT FOR UPDATE) to prevent concurrency races."""
-    stmt = select(Product).where(Product.id == product_id).with_for_update()
+    """Fetch product with row lock (SELECT FOR UPDATE) to prevent concurrency races.
+
+    Uses noload(Product.ledger_entries) to avoid O(N) loading of entire ledger history.
+    """
+    stmt = (
+        select(Product)
+        .options(noload("*"))
+        .where(Product.id == product_id)
+        .with_for_update()
+    )
     result = await db.scalars(stmt)
     product = result.first()
     if not product:
@@ -175,6 +185,72 @@ async def record_pos_sale(db: AsyncSession, req: POSSaleRequest) -> InventoryLed
     await db.commit()
     await db.refresh(ledger_entry)
     return ledger_entry
+
+
+async def record_pos_batch_sale(
+    db: AsyncSession, req: POSBatchSaleRequest
+) -> Sequence[InventoryLedger]:
+    """Atomic multi-item POS checkout deduction.
+
+    Locks all products in a single batch query (sorted deterministically
+    to prevent deadlocks), validates physical stock across all items, deducts
+    stock, and commits an atomic batch of inventory ledger movements in a
+    single transaction.
+    """
+    if not req.items:
+        return []
+
+    # Aggregate quantities by product_id in case the same item appears multiple times
+    item_totals: dict[int, int] = {}
+    for item in req.items:
+        item_totals[item.product_id] = (
+            item_totals.get(item.product_id, 0) + item.quantity
+        )
+
+    # Sort product IDs deterministically to eliminate deadlocks
+    sorted_product_ids = sorted(item_totals.keys())
+
+    # Lock all target products in a single bulk query without pulling ledger history
+    stmt = (
+        select(Product)
+        .options(noload("*"))
+        .where(col(Product.id).in_(sorted_product_ids))
+        .with_for_update()
+    )
+    products_by_id = {p.id: p for p in (await db.scalars(stmt)).all()}
+
+    # Verify all products exist and have sufficient physical stock
+    for pid, qty in item_totals.items():
+        product = products_by_id.get(pid)
+        if not product:
+            raise ValueError(f"Product with ID {pid} not found")
+        if product.current_stock < qty:
+            raise ValueError(
+                f"Physical stock depleted for '{product.name}' (SKU: {product.sku}): "
+                f"requested {qty}, available {product.current_stock}"
+            )
+
+    # Perform in-memory stock mutations and construct ledger entries
+    ledger_entries: list[InventoryLedger] = []
+    for pid, qty in item_totals.items():
+        product = products_by_id[pid]
+        product.current_stock -= qty
+
+        entry = InventoryLedger(
+            product_id=pid,
+            movement_type=InventoryMovementType.SALE_POS,
+            quantity_delta=-qty,
+            balance_after=product.current_stock,
+            reference_id=req.ticket_reference_id,
+            notes="In-store register sale",
+        )
+        ledger_entries.append(entry)
+
+    db.add_all(ledger_entries)
+    await db.commit()
+    for entry in ledger_entries:
+        await db.refresh(entry)
+    return ledger_entries
 
 
 async def audit_product_stock(db: AsyncSession, product_id: int) -> StockAuditResponse:

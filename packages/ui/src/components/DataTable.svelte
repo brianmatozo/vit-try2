@@ -23,10 +23,12 @@ let { table, class: className = '' }: DataTableProps<TData> = $props();
       {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
         <tr>
           {#each headerGroup.headers as header (header.id)}
+            {@const metaClass = (header.column.columnDef.meta as any)?.className ?? ''}
             <th
               scope="col"
               class={cn(
-                'px-4 py-3 font-semibold',
+                'px-3 sm:px-4 py-2 sm:py-3 font-semibold text-[11px] sm:text-xs',
+                metaClass,
                 header.column.getCanSort() && 'cursor-pointer hover:bg-gray-100'
               )}
               onclick={header.column.getToggleSortingHandler()}
@@ -50,7 +52,8 @@ let { table, class: className = '' }: DataTableProps<TData> = $props();
       {#each table.getRowModel().rows as row (row.id)}
         <tr class="hover:bg-gray-50 transition-colors">
           {#each row.getVisibleCells() as cell (cell.id)}
-            <td class="px-4 py-2.5 whitespace-nowrap">
+            {@const metaClass = (cell.column.columnDef.meta as any)?.className ?? ''}
+            <td class={cn('px-3 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap text-xs sm:text-sm', metaClass)}>
               <FlexRender {cell} />
             </td>
           {/each}

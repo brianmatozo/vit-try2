@@ -22,6 +22,7 @@ stuff.md
 rules.md
 .env
 openapi.json
+packages/api/src/generated/
 
 # Devenv
 .devenv*
@@ -91,7 +92,7 @@ dmypy.json
 docs/_build/
 instance/
 ipython_config.py
-lib/
+/lib/
 lib64/
 parts/
 profile_default/
@@ -275,7 +276,7 @@ coverage/
 *.tsbuildinfo
 build/
 dist/
-lib/
+/lib/
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -529,7 +530,7 @@ bower_components/
 cover/
 jspm_packages/
 lib-cov/
-lib/
+/lib/
 my-app*
 out/
 pids/
@@ -736,3 +737,6 @@ node_modules/.vite/
 .vite/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Unignore SvelteKit src/lib
+!**/src/lib/**

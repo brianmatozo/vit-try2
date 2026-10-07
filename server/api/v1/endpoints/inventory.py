@@ -7,6 +7,7 @@ from server.core.dependencies import get_async_db
 from server.models.inventory_ledger import InventoryMovementType
 from server.schemas.inventory import (
     InventoryLedgerResponse,
+    POSBatchSaleRequest,
     POSSaleRequest,
     ShrinkageMermaRequest,
     StockAdjustmentRequest,
@@ -153,6 +154,27 @@ async def record_pos_sale(
     try:
         entry = await service.record_pos_sale(db, req)
         return InventoryLedgerResponse.model_validate(entry)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/sale-pos/batch",
+    response_model=list[InventoryLedgerResponse],
+    status_code=status.HTTP_200_OK,
+    summary="Record atomic multi-item POS sale",
+    description=(
+        "Batch deduct inventory for full shopping cart in a single atomic transaction."
+    ),
+    operation_id="recordPOSBatchSale",
+)
+async def record_pos_batch_sale(
+    req: POSBatchSaleRequest,
+    db: AsyncSession = Depends(get_async_db),
+) -> list[InventoryLedgerResponse]:
+    try:
+        entries = await service.record_pos_batch_sale(db, req)
+        return [InventoryLedgerResponse.model_validate(e) for e in entries]
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

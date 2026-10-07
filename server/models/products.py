@@ -38,7 +38,7 @@ class Product(SQLModel, table=True):
     min_safety_buffer: int = Field(default=0)
 
     # External Channel Flags
-    is_active: bool = Field(default=True)
+    is_active: bool = Field(default=True, index=True)
     sync_pedidosya: bool = Field(default=True)
     sync_rappi: bool = Field(default=True)
     sync_vgo: bool = Field(default=True)

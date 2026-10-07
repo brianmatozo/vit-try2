@@ -45,32 +45,106 @@
 
   # Devenv helper commands (run directly in shell or with `devenv run <name>`)
   scripts = {
+    # Backend Development
     dev.exec = "uv run uvicorn server.main:app --reload --host 0.0.0.0";
-    lint.exec = "ruff check .";
-    fix.exec = "ruff check . --fix && ruff format .";
-    format.exec = "ruff format .";
+    "dev:be".exec = "uv run uvicorn server.main:app --reload --host 0.0.0.0";
+    db.exec = "docker compose up -d postgres";
+
+    # Frontend Development (supports both hyphen and colon syntax)
+    "dev-admin".exec = "pnpm --filter admin dev";
+    "dev:admin".exec = "pnpm --filter admin dev";
+    "dev-pos".exec = "pnpm --filter pos dev";
+    "dev:pos".exec = "pnpm --filter pos dev";
+
+    # Production Builds
+    build.exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build";
+    "build:all".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build";
+    "build-admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build";
+    "build:admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build";
+    "build-pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build";
+    "build:pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build";
+
+    # Linting & Formatting (Unified & Granular)
+    lint.exec = "echo '==> Ruff linting...' && ruff check . && echo '==> Biome linting...' && biome check .";
+    "lint:be".exec = "ruff check .";
+    "lint:fe".exec = "biome check .";
+    format.exec = "ruff format . && biome format --write .";
+    "format:be".exec = "ruff format .";
+    "format:fe".exec = "biome format --write .";
+    fix.exec = "ruff check . --fix && ruff format . && biome check --write .";
+    "fix:be".exec = "ruff check . --fix && ruff format .";
+    "fix:fe".exec = "biome check --write .";
+
+    # Type Checking
+    typecheck.exec = "ty check";
     "typecheck:fast".exec = "ty check";
-    typecheck.exec = "basedpyright";
+    "typecheck:strict".exec = "basedpyright";
+    "typecheck:fe".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin check && pnpm --filter pos check";
+
+    # Testing
     test.exec = "uv run pytest";
+    "test:be".exec = "uv run pytest";
+    "test:fe".exec = "pnpm --filter core test";
+    "test:all".exec = "uv run pytest && pnpm --filter core test";
+
+    # Full Verification Pipeline
     check.exec = ''
-      echo "==> Linting with ruff..."
+      echo "=========================================="
+      echo "==> [Backend] Linting with ruff..."
       ruff check .
-      echo "==> Checking format with ruff..."
+      echo "==> [Backend] Checking format with ruff..."
       ruff format --check .
-      echo "==> Type-checking with ty..."
+      echo "==> [Backend] Type-checking with ty..."
       ty check
-      echo "==> Running tests with pytest..."
+      echo "==> [Backend] Running pytest test suite..."
+      uv run pytest
+      echo "==> [API] Regenerating client for frontend validation..."
+      uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate
+      echo "==> [Frontend] Linting with biome..."
+      biome check .
+      echo "==> [Frontend] Checking admin app (svelte-check)..."
+      pnpm --filter admin check
+      echo "==> [Frontend] Checking pos app (svelte-check)..."
+      pnpm --filter pos check
+      echo "==> [Frontend] Running core package tests..."
+      pnpm --filter core test
+      echo "=========================================="
+      echo "All monorepo checks passed successfully!"
+      echo "=========================================="
+    '';
+    "check:be".exec = ''
+      echo "==> [Backend] Linting with ruff..."
+      ruff check .
+      echo "==> [Backend] Checking format with ruff..."
+      ruff format --check .
+      echo "==> [Backend] Type-checking with ty..."
+      ty check
+      echo "==> [Backend] Running pytest test suite..."
       uv run pytest
     '';
-    openapi.exec = "uv run python scripts/api_export.py";
+    "check:fe".exec = ''
+      echo "==> [API] Regenerating client for frontend validation..."
+      uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate
+      echo "==> [Frontend] Linting with biome..."
+      biome check .
+      echo "==> [Frontend] Checking admin app (svelte-check)..."
+      pnpm --filter admin check
+      echo "==> [Frontend] Checking pos app (svelte-check)..."
+      pnpm --filter pos check
+      echo "==> [Frontend] Running core package tests..."
+      pnpm --filter core test
+    '';
+    "check-admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin check";
+    "check:admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin check";
+    "check-pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos check";
+    "check:pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos check";
 
-    # Frontend scripts
-    "dev:admin".exec = "pnpm --filter admin dev -- --host";
-    "dev:pos".exec = "pnpm --filter pos dev -- --host";
-    "check:admin".exec = "pnpm --filter admin check";
-    "check:pos".exec = "pnpm --filter pos check";
-    "lint:fe".exec = "biome check .";
-    "format:fe".exec = "biome format --write .";
+    # OpenAPI & API Client Codegen
+    openapi.exec = "uv run python scripts/api_export.py";
+    codegen.exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate";
+    "api:generate".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate";
+    "codegen-watch".exec = "uv run watchfiles --filter python 'uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate' server/";
+    "codegen:watch".exec = "uv run watchfiles --filter python 'uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate' server/";
   };
 
   # Background processes managed by `devenv up`
@@ -80,8 +154,12 @@
       while ! pg_isready -h 127.0.0.1 -p 5432 -d vitalcer -U vitalcer -q; do
         sleep 0.5
       done
-      echo "PostgreSQL is ready, starting backend server..."
+      echo "PostgreSQL is ready, starting backend server on 0.0.0.0:8000..."
       uv run uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
+    '';
+    codegen.exec = ''
+      echo "Watching server/ for API schema changes to regenerate client..."
+      uv run watchfiles --filter python "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate" server/
     '';
   };
 
@@ -116,6 +194,12 @@
       uv sync
     fi
 
+    # Auto-generate API client stubs if not present
+    if [ ! -d "packages/api/src/generated" ]; then
+      echo "Generating API client stubs..."
+      uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate
+    fi
+
     echo ""
     echo "  Vitalcer dev environment loaded"
     echo "  Backend (Python):"
@@ -129,7 +213,15 @@
     echo "    • svelte-lsp:    $(svelteserver --version 2>/dev/null || echo 'available')"
     echo "    • vtsls (TS LSP):$(vtsls --version 2>/dev/null || echo 'available')"
     echo ""
-    echo "Commands: dev, dev:pos, check, check:pos, lint, lint:fe, format, format:fe, test"
+    echo "  Commands available:"
+    echo "    • Dev:       dev, dev-admin (dev:admin), dev-pos (dev:pos), db"
+    echo "    • Check:     check, check:be, check:fe, check-admin, check-pos"
+    echo "    • Lint/Fix:  lint, format, fix (or :be / :fe)"
+    echo "    • Typecheck: typecheck (ty), typecheck:strict (basedpyright)"
+    echo "    • Test:      test (pytest), test:fe, test:all"
+    echo "    • Build:     build, build-admin, build-pos"
+    echo "    • API:       openapi, codegen (api:generate)"
+    echo ""
   '';
 }
 

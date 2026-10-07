@@ -1,39 +1,57 @@
-export PATH := $(CURDIR)/.devenv/profile/bin:$(PATH)
+DEVENV_BIN := $(CURDIR)/.devenv/profile/bin
+export PATH := $(DEVENV_BIN):$(PATH)
 
-.PHONY: dev dev-admin dev-pos db lint format fix test check typecheck openapi
+.PHONY: up dev dev-admin dev-pos db lint format fix test check typecheck openapi codegen codegen-watch build build-admin build-pos
+
+up:
+	@devenv up
 
 db:
-	docker compose up -d postgres
+	@$(DEVENV_BIN)/db
 
 dev:
-	uv run uvicorn server.main:app --reload --host 0.0.0.0
+	@$(DEVENV_BIN)/dev
 
-dev-admin:
-	pnpm --filter admin dev -- --host
+dev-admin: codegen
+	@$(DEVENV_BIN)/dev-admin
 
-dev-pos:
-	pnpm --filter pos dev -- --host
+dev-pos: codegen
+	@$(DEVENV_BIN)/dev-pos
 
 lint:
-	ruff check .
+	@$(DEVENV_BIN)/lint
 
 fix:
-	ruff check . --fix && ruff format .
+	@$(DEVENV_BIN)/fix
 
 format:
-	ruff format .
+	@$(DEVENV_BIN)/format
 
 typecheck:
-	ty check
+	@$(DEVENV_BIN)/typecheck
 
 test:
-	uv run pytest
+	@$(DEVENV_BIN)/test
 
-check:
-	ruff check .
-	ruff format --check .
-	ty check
-	uv run pytest
+check: codegen
+	@$(DEVENV_BIN)/check
 
 openapi:
-	uv run python scripts/api_export.py
+	@$(DEVENV_BIN)/openapi
+
+codegen:
+	@$(DEVENV_BIN)/codegen
+
+codegen-watch:
+	@$(DEVENV_BIN)/codegen-watch
+
+build: codegen
+	@$(DEVENV_BIN)/build
+
+build-admin: codegen
+	@$(DEVENV_BIN)/build-admin
+
+build-pos: codegen
+	@$(DEVENV_BIN)/build-pos
+
+

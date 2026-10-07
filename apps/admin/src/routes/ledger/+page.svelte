@@ -65,6 +65,7 @@ const columns = columnHelper.columns([
 	columnHelper.accessor('id', {
 		header: 'ID',
 		cell: (info) => `#${info.getValue()}`,
+		meta: { className: 'hidden sm:table-cell' },
 	}),
 	columnHelper.accessor('created_at', {
 		header: 'Fecha / Hora',
@@ -74,16 +75,16 @@ const columns = columnHelper.columns([
 				? info.getValue()
 				: d.toLocaleString('es-AR', {
 						dateStyle: 'short',
-						timeStyle: 'medium',
+						timeStyle: 'short',
 					});
 		},
 	}),
 	columnHelper.accessor('product_id', {
-		header: 'ID Art.',
+		header: 'Art.',
 		cell: (info) => renderSnippet(productLinkSnippet, info.getValue()),
 	}),
 	columnHelper.accessor('movement_type', {
-		header: 'Tipo Movimiento',
+		header: 'Tipo',
 		cell: (info) => renderSnippet(movementTypeSnippet, info.getValue()),
 	}),
 	columnHelper.accessor('quantity_delta', {
@@ -91,16 +92,18 @@ const columns = columnHelper.columns([
 		cell: (info) => renderSnippet(deltaSnippet, info.getValue()),
 	}),
 	columnHelper.accessor('balance_after', {
-		header: 'Balance Posterior',
+		header: 'Saldo',
 		cell: (info) => `${info.getValue()}`,
 	}),
 	columnHelper.accessor('reference_id', {
-		header: 'Referencia / Ticket',
+		header: 'Referencia',
 		cell: (info) => info.getValue() || '—',
+		meta: { className: 'hidden md:table-cell' },
 	}),
 	columnHelper.accessor('notes', {
 		header: 'Observaciones',
 		cell: (info) => info.getValue() || '—',
+		meta: { className: 'hidden lg:table-cell' },
 	}),
 ]);
 
@@ -121,28 +124,28 @@ const table = createAppTable({
 {#snippet productLinkSnippet(productId: number)}
   <button
     type="button"
-    class="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+    class="font-mono text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer p-1 -m-1"
     onclick={() => {
       productIdInput = String(productId);
     }}
   >
-    Art #{productId}
+    #{productId}
   </button>
 {/snippet}
 
 {#snippet movementTypeSnippet(type: InventoryMovementType)}
   {#if type === 'receiving'}
-    <Badge variant="success">Entrada Proveedor</Badge>
+    <Badge variant="success" class="text-[10px] sm:text-xs">Entrada</Badge>
   {:else if type === 'sale_pos'}
-    <Badge variant="default">Venta Mostrador</Badge>
+    <Badge variant="default" class="text-[10px] sm:text-xs">Mostrador</Badge>
   {:else if type === 'delivery_fulfilled'}
-    <Badge variant="outline">Delivery</Badge>
+    <Badge variant="outline" class="text-[10px] sm:text-xs">Delivery</Badge>
   {:else if type === 'shrinkage_merma'}
-    <Badge variant="destructive">Merma / Pérdida</Badge>
+    <Badge variant="destructive" class="text-[10px] sm:text-xs">Merma</Badge>
   {:else if type === 'manual_adjustment'}
-    <Badge variant="warning">Ajuste Manual</Badge>
+    <Badge variant="warning" class="text-[10px] sm:text-xs">Ajuste</Badge>
   {:else}
-    <Badge variant="default">{type}</Badge>
+    <Badge variant="default" class="text-[10px] sm:text-xs">{type}</Badge>
   {/if}
 {/snippet}
 
@@ -162,20 +165,21 @@ const table = createAppTable({
   {/if}
 {/snippet}
 
-<div class="space-y-6">
+<div class="space-y-4 sm:space-y-6 min-w-0">
   <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
     <div>
-      <h1 class="text-xl font-bold tracking-tight text-gray-900">Lista general de stock</h1>
-      <p class="text-xs text-gray-500 mt-1">
-        Historial de stock
+      <h1 class="text-lg sm:text-xl font-bold tracking-tight text-gray-900">Historial y Auditoría de Stock</h1>
+      <p class="text-xs text-gray-500 mt-0.5 sm:mt-1">
+        Registro inmutable de movimientos, auditoría de balance y detección de desvíos.
       </p>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 w-full sm:w-auto">
       <Button
         variant="outline"
         size="sm"
+        class="w-full sm:w-auto justify-center"
         onclick={() => {
           ledgerQuery.refetch();
           if (activeProductId) auditQuery.refetch();
@@ -191,33 +195,43 @@ const table = createAppTable({
   <!-- Product Audit Card (when single product is selected) -->
   {#if activeProductId && auditQuery.data}
     {@const audit = auditQuery.data}
-    <Card class="p-4 border-l-4 {audit.is_reconciled ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-rose-500 bg-rose-50/30'}">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <Card class="p-3 sm:p-4 border-l-4 {audit.is_reconciled ? 'border-l-emerald-500 bg-emerald-50/30' : 'border-l-rose-500 bg-rose-50/30'}">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
             {#if audit.is_reconciled}
-              <ShieldCheck class="w-5 h-5 text-emerald-600" />
-              <span class="font-bold text-emerald-900 text-sm">Stock Consistente / Sin Desvío</span>
+              <ShieldCheck class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0" />
+              <span class="font-bold text-emerald-900 text-xs sm:text-sm">Stock Consistente</span>
             {:else}
-              <AlertTriangle class="w-5 h-5 text-rose-600" />
-              <span class="font-bold text-rose-900 text-sm">¡Alerta de Desvío en Auditoría!</span>
+              <AlertTriangle class="w-4 h-4 sm:w-5 sm:h-5 text-rose-600 shrink-0" />
+              <span class="font-bold text-rose-900 text-xs sm:text-sm">¡Alerta de Desvío!</span>
             {/if}
-            <span class="text-xs font-mono text-gray-600">[{audit.sku}] {audit.name}</span>
+            <span class="text-xs font-mono text-gray-600 font-medium">[{audit.sku}] {audit.name}</span>
           </div>
 
-          <div class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600 font-mono">
-            <span>Stock Físico Actual: <strong class="text-gray-900">{audit.current_stock}</strong></span>
-            <span>Suma de Ledger: <strong class="text-gray-900">{audit.ledger_calculated_balance}</strong></span>
-            <span>Reservado Delivery: <strong class="text-gray-900">{audit.reserved_stock}</strong></span>
-            <span>Stock Virtual Libre: <strong class="text-gray-900">{audit.virtual_stock}</strong></span>
-            <span>Desvío (Drift): <strong class={audit.drift === 0 ? 'text-emerald-700' : 'text-rose-700'}>{audit.drift}</strong></span>
+          <div class="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-x-6 sm:gap-y-1 text-xs text-gray-600 font-mono">
+            <div class="bg-white/70 p-2 rounded sm:bg-transparent sm:p-0">
+              Stock Físico: <strong class="text-gray-900">{audit.current_stock}</strong>
+            </div>
+            <div class="bg-white/70 p-2 rounded sm:bg-transparent sm:p-0">
+              Suma Ledger: <strong class="text-gray-900">{audit.ledger_calculated_balance}</strong>
+            </div>
+            <div class="bg-white/70 p-2 rounded sm:bg-transparent sm:p-0">
+              Reservado: <strong class="text-gray-900">{audit.reserved_stock}</strong>
+            </div>
+            <div class="bg-white/70 p-2 rounded sm:bg-transparent sm:p-0">
+              Virtual Libre: <strong class="text-gray-900">{audit.virtual_stock}</strong>
+            </div>
+            <div class="bg-white/70 p-2 rounded sm:bg-transparent sm:p-0 col-span-2 sm:col-span-1">
+              Desvío (Drift): <strong class={audit.drift === 0 ? 'text-emerald-700 font-bold' : 'text-rose-700 font-bold'}>{audit.drift}</strong>
+            </div>
           </div>
         </div>
 
         <Button
           variant="outline"
           size="sm"
-          class="self-start md:self-auto text-xs"
+          class="w-full sm:w-auto text-xs justify-center shrink-0"
           onclick={() => {
             productIdInput = '';
           }}
@@ -229,8 +243,8 @@ const table = createAppTable({
   {/if}
 
   <!-- Filter Bar -->
-  <div class="flex flex-wrap items-center gap-3">
-    <div class="w-48">
+  <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+    <div class="w-full sm:w-48">
       <Input
         type="number"
         placeholder="Filtrar por ID Prod..."
@@ -238,10 +252,10 @@ const table = createAppTable({
       />
     </div>
 
-    <div class="w-56">
+    <div class="w-full sm:w-56">
       <select
         bind:value={selectedMovementType}
-        class="w-full h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-800 shadow-xs focus:outline-none focus:border-emerald-600"
+        class="w-full h-10 sm:h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-base sm:text-sm text-gray-800 shadow-xs focus:outline-none focus:border-emerald-600"
       >
         <option value="">Todos los movimientos</option>
         <option value="receiving">Entrada Proveedor</option>
@@ -252,33 +266,35 @@ const table = createAppTable({
       </select>
     </div>
 
-    {#if activeProductId || selectedMovementType}
-      <Button
-        variant="ghost"
-        size="sm"
-        onclick={() => {
-          productIdInput = '';
-          selectedMovementType = '';
-        }}
-      >
-        Restablecer Filtros
-      </Button>
-    {/if}
+    <div class="flex items-center justify-between w-full sm:w-auto sm:ml-auto gap-2 pt-1 sm:pt-0">
+      {#if activeProductId || selectedMovementType}
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={() => {
+            productIdInput = '';
+            selectedMovementType = '';
+          }}
+        >
+          Restablecer Filtros
+        </Button>
+      {/if}
 
-    <span class="text-xs text-gray-500 ml-auto font-mono">
-      {ledgerRecords.length} movimientos
-    </span>
+      <span class="text-xs text-gray-500 font-mono ml-auto">
+        {ledgerRecords.length} movimientos
+      </span>
+    </div>
   </div>
 
   <!-- Virtualized Data Table -->
   {#if ledgerQuery.isPending}
-    <div class="h-96 border border-gray-200 rounded-md bg-white flex items-center justify-center text-sm text-gray-400">
-      Cargando lista...
+    <div class="h-80 sm:h-96 border border-gray-200 rounded-md bg-white flex items-center justify-center text-sm text-gray-400">
+      Cargando lista de movimientos...
     </div>
   {:else if ledgerQuery.isError}
-    <div class="h-96 border border-rose-200 rounded-md bg-rose-50 p-6 flex flex-col items-center justify-center text-center">
+    <div class="h-80 sm:h-96 border border-rose-200 rounded-md bg-rose-50 p-6 flex flex-col items-center justify-center text-center">
       <AlertTriangle class="w-8 h-8 text-rose-500 mb-2" />
-      <p class="text-sm font-medium text-rose-900">Error al cargar lista de stock</p>
+      <p class="text-sm font-medium text-rose-900">Error al cargar movimientos</p>
       <p class="text-xs text-rose-600 mt-1">
         {((ledgerQuery.error as any)?.message) ?? 'Verifica la conexión con el servidor backend'}
       </p>
@@ -287,6 +303,6 @@ const table = createAppTable({
       </Button>
     </div>
   {:else}
-    <VirtualTable {table} height="600px" />
+    <VirtualTable {table} height="calc(100vh - 300px)" class="min-h-[400px]" />
   {/if}
 </div>

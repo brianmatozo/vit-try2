@@ -26,44 +26,45 @@ let {
 <BitsDialog.Root bind:open>
   <BitsDialog.Portal>
     <BitsDialog.Overlay
-      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity"
+      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity"
     />
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto pointer-events-none">
-      <BitsDialog.Content
-        class={cn(
-          'pointer-events-auto relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-xl text-gray-900 focus:outline-none overflow-y-auto',
-          className
-        )}
-      >
-        <div class="flex items-start justify-between mb-4 shrink-0">
-          <div>
-            <BitsDialog.Title class="text-base font-semibold text-gray-900">
-              {title}
-            </BitsDialog.Title>
-            {#if description}
-              <BitsDialog.Description class="text-xs text-gray-500 mt-0.5">
-                {description}
-              </BitsDialog.Description>
-            {/if}
-          </div>
-          <BitsDialog.Close
-            class="rounded-sm p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            <X class="w-4 h-4" />
-            <span class="sr-only">Cerrar</span>
-          </BitsDialog.Close>
-        </div>
+    <BitsDialog.Content
+      class={cn(
+        'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-2xl border-t border-x border-gray-200 bg-white p-4 pb-6 shadow-2xl text-gray-900 focus:outline-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:max-h-[88dvh] sm:rounded-xl sm:border sm:p-6',
+        className
+      )}
+    >
+      <!-- Mobile bottom-sheet drag handle indicator -->
+      <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-2.5 sm:hidden shrink-0"></div>
 
-        <div class="my-2 flex-1 overflow-y-auto">
-          {@render children?.()}
+      <div class="flex items-start justify-between mb-3 shrink-0">
+        <div>
+          <BitsDialog.Title class="text-base font-semibold text-gray-900">
+            {title}
+          </BitsDialog.Title>
+          {#if description}
+            <BitsDialog.Description class="text-xs text-gray-500 mt-0.5">
+              {description}
+            </BitsDialog.Description>
+          {/if}
         </div>
+        <BitsDialog.Close
+          class="rounded-md p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer -mr-1 -mt-1"
+        >
+          <X class="w-5 h-5 sm:w-4 sm:h-4" />
+          <span class="sr-only">Cerrar</span>
+        </BitsDialog.Close>
+      </div>
 
-        {#if footer}
-          <div class="mt-4 flex justify-end gap-2 pt-3 border-t border-gray-100 shrink-0">
-            {@render footer()}
-          </div>
-        {/if}
-      </BitsDialog.Content>
-    </div>
+      <div class="my-1 flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1">
+        {@render children?.()}
+      </div>
+
+      {#if footer}
+        <div class="mt-3 flex flex-wrap justify-end gap-2 pt-3 border-t border-gray-100 shrink-0">
+          {@render footer()}
+        </div>
+      {/if}
+    </BitsDialog.Content>
   </BitsDialog.Portal>
 </BitsDialog.Root>

@@ -6,6 +6,7 @@ import {
 	type TableFeatures,
 } from '@tanstack/svelte-table';
 import { createVirtualizer } from '@tanstack/svelte-virtual';
+import { get } from 'svelte/store';
 import { cn } from '../utils.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table v9 generic row data default
@@ -29,12 +30,23 @@ let scrollContainer: HTMLDivElement | undefined = $state();
 const rows = $derived(table.getRowModel().rows);
 
 const virtualizer = createVirtualizer({
-	get count() {
-		return rows.length;
-	},
+	count: 0,
 	getScrollElement: () => scrollContainer ?? null,
 	estimateSize: () => estimateRowHeight,
 	overscan: 10,
+	getItemKey: (index) => rows[index]?.id ?? index,
+});
+
+$effect(() => {
+	const count = rows.length;
+	const container = scrollContainer;
+	get(virtualizer).setOptions({
+		count,
+		getScrollElement: () => container ?? null,
+		estimateSize: () => estimateRowHeight,
+		overscan: 10,
+		getItemKey: (index) => rows[index]?.id ?? index,
+	});
 });
 
 const virtualRows = $derived($virtualizer.getVirtualItems());
@@ -61,10 +73,12 @@ const paddingBottom = $derived(
       {#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
         <tr>
           {#each headerGroup.headers as header (header.id)}
+            {@const metaClass = (header.column.columnDef.meta as any)?.className ?? ''}
             <th
               scope="col"
               class={cn(
-                'px-4 py-3 font-semibold bg-gray-50',
+                'px-3 sm:px-4 py-2 sm:py-3 font-semibold bg-gray-50 text-[11px] sm:text-xs',
+                metaClass,
                 header.column.getCanSort() && 'cursor-pointer hover:bg-gray-100'
               )}
               onclick={header.column.getToggleSortingHandler()}
@@ -94,21 +108,22 @@ const paddingBottom = $derived(
             No se encontraron registros
           </td>
         </tr>
-      {:else}
+      {:else if virtualRows.length > 0}
         {#if paddingTop > 0}
           <tr>
             <td style:height="{paddingTop}px" colspan={table.getAllColumns().length}></td>
           </tr>
         {/if}
-        {#each virtualRows as virtualRow (virtualRow.index)}
+        {#each virtualRows as virtualRow (virtualRow.key ?? virtualRow.index)}
           {@const row = rows[virtualRow.index]}
           {#if row}
             <tr
               data-index={virtualRow.index}
               class="hover:bg-gray-50 transition-colors h-[40px]"
             >
-              {#each row.getVisibleCells() as cell (cell.id)}
-                <td class="px-4 py-2.5 whitespace-nowrap">
+              {#each (row.getVisibleCells ? row.getVisibleCells() : row.getAllCells()) as cell (cell.id)}
+                {@const metaClass = (cell.column.columnDef.meta as any)?.className ?? ''}
+                <td class={cn('px-3 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap text-xs sm:text-sm', metaClass)}>
                   <FlexRender {cell} />
                 </td>
               {/each}
@@ -120,6 +135,17 @@ const paddingBottom = $derived(
             <td style:height="{paddingBottom}px" colspan={table.getAllColumns().length}></td>
           </tr>
         {/if}
+      {:else}
+        {#each rows.slice(0, 30) as row (row.id)}
+          <tr class="hover:bg-gray-50 transition-colors h-[40px]">
+            {#each (row.getVisibleCells ? row.getVisibleCells() : row.getAllCells()) as cell (cell.id)}
+              {@const metaClass = (cell.column.columnDef.meta as any)?.className ?? ''}
+              <td class={cn('px-3 sm:px-4 py-2 sm:py-2.5 whitespace-nowrap text-xs sm:text-sm', metaClass)}>
+                <FlexRender {cell} />
+              </td>
+            {/each}
+          </tr>
+        {/each}
       {/if}
     </tbody>
   </table>

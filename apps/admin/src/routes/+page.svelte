@@ -16,7 +16,7 @@ import {
 	productReadMultiApiV1ProductsGetOptions,
 	productUpdateApiV1ProductsIdPatchMutation,
 } from '@vitalcer/api';
-import { formatARS, formatWeight } from '@vitalcer/core';
+import { formatARS, formatWeight, parseBarcode } from '@vitalcer/core';
 import { Badge, Button, Card, Dialog, Input, VirtualTable } from '@vitalcer/ui';
 import {
 	AlertCircle,
@@ -198,14 +198,25 @@ async function handleSaveProduct(e: SubmitEvent) {
 
 const products = $derived<ProductResponse[]>(
 	productsQuery.data && 'data' in productsQuery.data
-		? productsQuery.data.data
-		: [],
+		? (productsQuery.data.data as ProductResponse[])
+		: Array.isArray(productsQuery.data)
+			? (productsQuery.data as ProductResponse[])
+			: [],
 );
 
 const filteredProducts = $derived(
 	products.filter((p) => {
-		const term = searchTerm.toLowerCase().trim();
+		const rawTerm = searchTerm.trim();
+		const term = rawTerm.toLowerCase();
 		if (!term) return true;
+
+		const parsed = parseBarcode(rawTerm);
+		if (parsed.isEmbeddedWeight && p.plu_code) {
+			if (p.plu_code.toLowerCase() === parsed.skuOrPlu.toLowerCase()) {
+				return true;
+			}
+		}
+
 		return (
 			p.name.toLowerCase().includes(term) ||
 			p.sku.toLowerCase().includes(term) ||
@@ -232,25 +243,28 @@ const columns = columnHelper.columns([
 	columnHelper.accessor('sku', {
 		header: 'SKU / Código',
 		cell: (info) => info.getValue(),
+		meta: { className: 'hidden md:table-cell' },
 	}),
 	columnHelper.accessor('plu_code', {
 		header: 'PLU',
 		cell: (info) => info.getValue() ?? '—',
+		meta: { className: 'hidden md:table-cell' },
 	}),
 	columnHelper.accessor('name', {
 		header: 'Nombre del Producto',
-		cell: (info) => info.getValue(),
+		cell: (info) => renderSnippet(nameCellSnippet, info.row.original),
 	}),
 	columnHelper.accessor('product_type', {
 		header: 'Tipo',
 		cell: (info) => renderSnippet(typeCellSnippet, info.getValue()),
+		meta: { className: 'hidden lg:table-cell' },
 	}),
 	columnHelper.accessor('unit_price', {
-		header: 'Precio Unitario',
+		header: 'Precio',
 		cell: (info) => formatARS(info.getValue()),
 	}),
 	columnHelper.accessor('current_stock', {
-		header: 'Stock Físico',
+		header: 'Stock',
 		cell: (info) => {
 			const row = info.row.original;
 			return row.product_type === 'bulk'
@@ -266,6 +280,7 @@ const columns = columnHelper.columns([
 			if (!val) return '0';
 			return row.product_type === 'bulk' ? formatWeight(val) : `${val} u`;
 		},
+		meta: { className: 'hidden lg:table-cell' },
 	}),
 	columnHelper.accessor('virtual_stock', {
 		header: 'Stock Virtual',
@@ -274,10 +289,12 @@ const columns = columnHelper.columns([
 			const val = info.getValue();
 			return row.product_type === 'bulk' ? formatWeight(val) : `${val} u`;
 		},
+		meta: { className: 'hidden sm:table-cell' },
 	}),
 	columnHelper.accessor('is_active', {
 		header: 'Estado',
 		cell: (info) => renderSnippet(statusCellSnippet, info.getValue()),
+		meta: { className: 'hidden md:table-cell' },
 	}),
 	columnHelper.display({
 		id: 'actions',
@@ -300,6 +317,28 @@ const table = createAppTable({
 });
 </script>
 
+{#snippet nameCellSnippet(product: ProductResponse)}
+  <div class="flex flex-col py-0.5 max-w-[180px] xs:max-w-[220px] sm:max-w-none">
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <span class="font-medium text-gray-900 leading-tight">{product.name}</span>
+      <span class="md:hidden inline-flex items-center gap-1">
+        {#if product.product_type === 'bulk'}
+          <Badge variant="success" class="text-[9px] px-1 py-0">Granel</Badge>
+        {/if}
+        {#if !product.is_active}
+          <Badge variant="destructive" class="text-[9px] px-1 py-0">Inactivo</Badge>
+        {/if}
+      </span>
+    </div>
+    <div class="text-[10px] sm:text-[11px] text-gray-400 font-mono flex items-center gap-1.5 mt-0.5 md:hidden">
+      <span>{product.sku}</span>
+      {#if product.plu_code}
+        <span>• PLU {product.plu_code}</span>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
 {#snippet typeCellSnippet(type: string | undefined)}
   {#if type === 'bulk'}
     <Badge variant="success">Granel</Badge>
@@ -317,39 +356,42 @@ const table = createAppTable({
 {/snippet}
 
 {#snippet actionsCellSnippet(product: ProductResponse)}
-  <div class="flex items-center gap-3">
+  <div class="flex items-center gap-2 sm:gap-3">
     <button
       type="button"
       onclick={() => openEditModal(product)}
-      class="text-xs text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1 cursor-pointer"
+      class="text-xs text-emerald-700 hover:text-emerald-900 font-medium inline-flex items-center gap-1 cursor-pointer p-1 -m-1"
+      title="Editar producto"
     >
-      <Edit2 class="w-3 h-3" />
-      <span>Editar</span>
+      <Edit2 class="w-3.5 h-3.5" />
+      <span class="hidden sm:inline">Editar</span>
     </button>
     <a
       href="/ledger?product_id={product.id}"
-      class="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+      class="text-xs text-blue-600 hover:text-blue-800 underline font-medium p-1 -m-1"
+      title="Ver movimientos en ledger"
     >
       Ledger
     </a>
   </div>
 {/snippet}
 
-<div class="space-y-6">
+<div class="space-y-4 sm:space-y-6 min-w-0">
   <!-- Top Title & Controls -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
     <div>
-      <h1 class="text-xl font-bold tracking-tight text-gray-900">Catálogo de Productos</h1>
-      <p class="text-xs text-gray-500 mt-1">
+      <h1 class="text-lg sm:text-xl font-bold tracking-tight text-gray-900">Catálogo de Productos</h1>
+      <p class="text-xs text-gray-500 mt-0.5 sm:mt-1">
         Consulta y administración de maestros de artículos, precios en ARS y sincronización de stock.
       </p>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 w-full sm:w-auto">
       <Button
         variant="primary"
         size="sm"
         onclick={openCreateModal}
+        class="flex-1 sm:flex-none justify-center"
       >
         <Plus class="w-3.5 h-3.5" />
         <span>Nuevo Producto</span>
@@ -360,6 +402,7 @@ const table = createAppTable({
         size="sm"
         onclick={() => productsQuery.refetch()}
         disabled={productsQuery.isFetching}
+        class="flex-1 sm:flex-none justify-center"
       >
         <RefreshCw class="w-3.5 h-3.5 {productsQuery.isFetching ? 'animate-spin' : ''}" />
         <span>Actualizar</span>
@@ -378,7 +421,7 @@ const table = createAppTable({
         <button
           type="button"
           onclick={() => (successBanner = null)}
-          class="text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer"
+          class="text-xs text-emerald-600 hover:text-emerald-800 cursor-pointer p-1"
         >
           Cerrar
         </button>
@@ -387,43 +430,43 @@ const table = createAppTable({
   {/if}
 
   <!-- Summary Cards -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <Card class="p-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+    <Card class="p-2.5 sm:p-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-gray-500">Total Artículos</span>
-        <Layers class="w-4 h-4 text-gray-400" />
+        <span class="text-[11px] sm:text-xs text-gray-500">Total Artículos</span>
+        <Layers class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
       </div>
-      <p class="text-lg font-bold text-gray-900 font-mono mt-1">{totalProducts}</p>
+      <p class="text-base sm:text-lg font-bold text-gray-900 font-mono mt-0.5 sm:mt-1">{totalProducts}</p>
     </Card>
 
-    <Card class="p-3">
+    <Card class="p-2.5 sm:p-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-gray-500">Granel (Pesables)</span>
-        <Scale class="w-4 h-4 text-emerald-600" />
+        <span class="text-[11px] sm:text-xs text-gray-500">Granel (Pesables)</span>
+        <Scale class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
       </div>
-      <p class="text-lg font-bold text-emerald-700 font-mono mt-1">{bulkProducts}</p>
+      <p class="text-base sm:text-lg font-bold text-emerald-700 font-mono mt-0.5 sm:mt-1">{bulkProducts}</p>
     </Card>
 
-    <Card class="p-3">
+    <Card class="p-2.5 sm:p-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-gray-500">Unitarios (Discretos)</span>
-        <Layers class="w-4 h-4 text-blue-600" />
+        <span class="text-[11px] sm:text-xs text-gray-500">Unitarios</span>
+        <Layers class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
       </div>
-      <p class="text-lg font-bold text-blue-700 font-mono mt-1">{discreteProducts}</p>
+      <p class="text-base sm:text-lg font-bold text-blue-700 font-mono mt-0.5 sm:mt-1">{discreteProducts}</p>
     </Card>
 
-    <Card class="p-3">
+    <Card class="p-2.5 sm:p-3">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-gray-500">Sin Stock (Físico &le; 0)</span>
-        <AlertCircle class="w-4 h-4 text-rose-500" />
+        <span class="text-[11px] sm:text-xs text-gray-500">Sin Stock</span>
+        <AlertCircle class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
       </div>
-      <p class="text-lg font-bold text-rose-600 font-mono mt-1">{lowStockProducts}</p>
+      <p class="text-base sm:text-lg font-bold text-rose-600 font-mono mt-0.5 sm:mt-1">{lowStockProducts}</p>
     </Card>
   </div>
 
   <!-- Filter Bar -->
-  <div class="flex items-center gap-3">
-    <div class="relative flex-1 max-w-sm">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
+    <div class="relative w-full sm:max-w-sm">
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <Input
         type="search"
@@ -433,19 +476,19 @@ const table = createAppTable({
       />
     </div>
     {#if searchTerm}
-      <span class="text-xs text-gray-500">
-        Mostrando {filteredProducts.length} de {totalProducts}
+      <span class="text-xs text-gray-500 font-medium">
+        Mostrando {filteredProducts.length} de {totalProducts} artículos
       </span>
     {/if}
   </div>
 
   <!-- Virtualized Data Table -->
   {#if productsQuery.isPending}
-    <div class="h-96 border border-gray-200 rounded-md bg-white flex items-center justify-center text-sm text-gray-400">
+    <div class="h-80 sm:h-96 border border-gray-200 rounded-md bg-white flex items-center justify-center text-sm text-gray-400">
       Cargando catálogo de productos...
     </div>
   {:else if productsQuery.isError}
-    <div class="h-96 border border-rose-200 rounded-md bg-rose-50 p-6 flex flex-col items-center justify-center text-center">
+    <div class="h-80 sm:h-96 border border-rose-200 rounded-md bg-rose-50 p-6 flex flex-col items-center justify-center text-center">
       <AlertCircle class="w-8 h-8 text-rose-500 mb-2" />
       <p class="text-sm font-medium text-rose-900">Error al cargar productos</p>
       <p class="text-xs text-rose-600 mt-1">
@@ -456,7 +499,7 @@ const table = createAppTable({
       </Button>
     </div>
   {:else}
-    <VirtualTable {table} height="600px" />
+    <VirtualTable {table} height="calc(100vh - 330px)" class="min-h-[400px]" />
   {/if}
 </div>
 
@@ -496,7 +539,7 @@ const table = createAppTable({
           <select
             id="prod-type"
             bind:value={formProductType}
-            class="w-full h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-900 shadow-xs focus:outline-none focus:border-emerald-600"
+            class="w-full h-10 sm:h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-base sm:text-sm text-gray-900 shadow-xs focus:outline-none focus:border-emerald-600"
           >
             <option value="discrete">Unidad (Discreto)</option>
             <option value="bulk">Pesable / Granel (Balanza)</option>
@@ -518,7 +561,7 @@ const table = createAppTable({
 
       <!-- Bulk specific fields -->
       {#if formProductType === 'bulk'}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-md border border-emerald-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
           <div>
             <label for="prod-plu" class="block text-xs font-semibold text-emerald-900 mb-1">
               Código PLU Balanza (4 dígitos)
@@ -543,16 +586,16 @@ const table = createAppTable({
               bind:value={formBulkReferenceGrams}
               required
             />
-            <span class="text-[10px] text-emerald-700 mt-0.5 block">Precio expresado cada N gramos (ej: 100g)</span>
+            <span class="text-[10px] text-emerald-700 mt-0.5 block">Precio cada N gramos (ej: 100g)</span>
           </div>
         </div>
       {/if}
 
-      <!-- Pricing & Initial Stock -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- Pricing & Initial Stock / Buffer -->
+      <div class="grid grid-cols-1 {!editingProduct ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3">
         <div>
           <label for="prod-price" class="block text-xs font-semibold text-gray-700 mb-1">
-            {formProductType === 'bulk' ? `Precio por ${formBulkReferenceGrams}g ($ ARS) *` : 'Precio por Unidad ($ ARS) *'}
+            {formProductType === 'bulk' ? `Precio / ${formBulkReferenceGrams}g ($ ARS) *` : 'Precio / Unidad ($ ARS) *'}
           </label>
           <Input
             id="prod-price"
@@ -576,65 +619,54 @@ const table = createAppTable({
               bind:value={formInitialStock}
             />
           </div>
-        {:else}
-          <div>
-            <label for="prod-buffer" class="block text-xs font-semibold text-gray-700 mb-1">
-              Buffer Seguridad (Delivery)
-            </label>
-            <Input
-              id="prod-buffer"
-              type="number"
-              min="0"
-              bind:value={formMinSafetyBuffer}
-            />
-          </div>
         {/if}
-      </div>
 
-      <!-- Buffer if creating -->
-      {#if !editingProduct}
         <div>
-          <label for="prod-buffer-create" class="block text-xs font-semibold text-gray-700 mb-1">
-            Buffer de Seguridad (withheld from delivery platforms)
+          <label for="prod-buffer" class="block text-xs font-semibold text-gray-700 mb-1">
+            Buffer Seguridad (Delivery)
           </label>
           <Input
-            id="prod-buffer-create"
+            id="prod-buffer"
             type="number"
             min="0"
+            placeholder="0"
             bind:value={formMinSafetyBuffer}
           />
+          <span class="text-[10px] text-gray-500 mt-0.5 block">Reserva no publicada en apps</span>
         </div>
-      {/if}
+      </div>
 
       <!-- Status & Channels -->
-      <div class="pt-2 border-t border-gray-100 space-y-2">
+      <div class="pt-2 border-t border-gray-100 space-y-2.5">
         <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-800">
           <input
             type="checkbox"
             bind:checked={formIsActive}
-            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+            class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 w-4 h-4"
           />
           <span>Artículo Activo / Disponible para venta</span>
         </label>
 
-        <div class="text-[11px] text-gray-500 font-medium pt-1">Sincronización con canales:</div>
-        <div class="flex flex-wrap gap-4 text-xs text-gray-700">
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" bind:checked={formSyncPedidosya} class="rounded border-gray-300 text-emerald-600" />
-            <span>PedidosYa</span>
-          </label>
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" bind:checked={formSyncRappi} class="rounded border-gray-300 text-emerald-600" />
-            <span>Rappi</span>
-          </label>
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" bind:checked={formSyncVgo} class="rounded border-gray-300 text-emerald-600" />
-            <span>VGO</span>
-          </label>
-          <label class="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" bind:checked={formSyncMercadolibre} class="rounded border-gray-300 text-emerald-600" />
-            <span>MercadoLibre</span>
-          </label>
+        <div>
+          <div class="text-[11px] text-gray-500 font-medium mb-1.5">Sincronización con canales de delivery:</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-700">
+            <label class="flex items-center gap-1.5 p-2 rounded-md border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors">
+              <input type="checkbox" bind:checked={formSyncPedidosya} class="rounded border-gray-300 text-emerald-600 w-3.5 h-3.5" />
+              <span>PedidosYa</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-md border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors">
+              <input type="checkbox" bind:checked={formSyncRappi} class="rounded border-gray-300 text-emerald-600 w-3.5 h-3.5" />
+              <span>Rappi</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-md border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors">
+              <input type="checkbox" bind:checked={formSyncVgo} class="rounded border-gray-300 text-emerald-600 w-3.5 h-3.5" />
+              <span>VGO</span>
+            </label>
+            <label class="flex items-center gap-1.5 p-2 rounded-md border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors">
+              <input type="checkbox" bind:checked={formSyncMercadolibre} class="rounded border-gray-300 text-emerald-600 w-3.5 h-3.5" />
+              <span>MercadoLibre</span>
+            </label>
+          </div>
         </div>
       </div>
     </form>
@@ -645,6 +677,7 @@ const table = createAppTable({
       variant="outline"
       size="sm"
       type="button"
+      class="flex-1 sm:flex-none justify-center"
       onclick={() => (isDialogOpen = false)}
     >
       Cancelar
@@ -653,6 +686,7 @@ const table = createAppTable({
       size="sm"
       type="submit"
       form="productForm"
+      class="flex-1 sm:flex-none justify-center"
       disabled={createProductMutation.isPending || updateProductMutation.isPending}
     >
       {createProductMutation.isPending || updateProductMutation.isPending ? 'Guardando...' : (editingProduct ? 'Guardar Cambios' : 'Crear Producto')}
