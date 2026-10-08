@@ -343,13 +343,15 @@ function handleClose() {
 				</div>
 			{/if}
 		</div>
+	{/if}
 
-		{#snippet footer()}
+	{#snippet footer()}
+		{#if !completedTicket}
 			<Button
 				variant="outline"
 				onclick={handleClose}
 				disabled={isProcessing}
-				class="w-24"
+				class="w-24 cursor-pointer"
 			>
 				Volver
 			</Button>
@@ -357,7 +359,7 @@ function handleClose() {
 				variant="primary"
 				onclick={handleConfirmSale}
 				disabled={isProcessing || !isCashValid || cart.isEmpty}
-				class="flex-1 h-12 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md flex items-center justify-center gap-2"
+				class="flex-1 h-12 text-sm font-bold bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer"
 			>
 				{#if isProcessing}
 					<Loader2 class="w-4 h-4 animate-spin" />
@@ -366,6 +368,6 @@ function handleClose() {
 					<span>Confirmar Cobro ({formatARS(total)})</span>
 				{/if}
 			</Button>
-		{/snippet}
-	{/if}
+		{/if}
+	{/snippet}
 </Dialog>

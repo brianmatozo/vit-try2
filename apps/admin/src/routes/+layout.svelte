@@ -25,6 +25,7 @@ const queryClient = new QueryClient({
 
 const navLinks = [
 	{ href: '/', label: 'Catálogo de Productos', shortLabel: 'Catálogo' },
+	{ href: '/sales', label: 'Ventas de Caja', shortLabel: 'Ventas' },
 	{ href: '/ledger', label: 'Auditoría', shortLabel: 'Auditoría' },
 	{ href: '/actions', label: 'Acciones de Stock', shortLabel: 'Operaciones' },
 ];
