@@ -1,109 +1,117 @@
-# AGENTS.md — Developer Environment & Agent Context
+# AGENTS.md — Developer Environment, System Architecture & Agent Rules
 
-This repository is **Vitalcer**, a single-store dietetic store management system featuring a **FastAPI + SQLModel** backend and separated **SvelteKit static SPAs** (`apps/pos`, `apps/admin`) in a pnpm monorepo.
-
----
-
-## 1. Environment & Package Access (`devenv.nix`)
-
-All developer tools are provisioned hermetically via **Nix (`devenv.nix`)** and symlinked into `.devenv/profile/bin/`.
-
-| Tool | Purpose | Primary Invocation |
-| :--- | :--- | :--- |
-| **`uv`** | Python 3.14 package & virtualenv manager | `uv run ...` / `uv add <pkg>` |
-| **`ruff`** | Ultra-fast Python linter & formatter | `ruff check .` / `ruff format .` |
-| **`ty`** | Astral's fast type checker (Rust) | `ty check` |
-| **`basedpyright`**| Strict type checker & Python language server | `basedpyright` |
-| **`biome`** | Ultra-fast JS/TS linter & formatter (Rust) | `biome check .` / `biome format --write .` |
-| **`pnpm`** | Workspace package manager for frontend | `pnpm --filter <pkg> <cmd>` |
-| **`postgresql_18`**| `psql`, `pg_dump`, and native database tools | `psql -U vitalcer -d vitalcer` |
-
-### How to Run Commands
-You have three reliable ways to execute commands:
-
-1. **Via `make` (Recommended)**:  
-   The `Makefile` forwards all commands directly to the hermetic devenv scripts in `.devenv/profile/bin`.
-   ```bash
-   make up          # Start all services concurrently (postgres, backend, admin, pos)
-   make dev         # Run FastAPI backend with hot reload (host 0.0.0.0:8000)
-   make dev-admin   # Run Admin SPA (host 0.0.0.0:5173)
-   make dev-pos     # Run POS cashier SPA (host 0.0.0.0:5174)
-   make db          # Start PostgreSQL (docker compose up -d postgres)
-   make lint        # Run ruff check . && biome check .
-   make fix         # Fix lint errors & auto-format (ruff + biome)
-   make format      # Auto-format (ruff format . && biome format)
-   make typecheck   # Fast type-check with ty
-   make test        # Run pytest test suite
-   make check       # Full validation: lint, format, typecheck, pytest, svelte-check & vitest
-   make build       # Build all frontend SPAs (admin & pos)
-   make openapi     # Export backend schema to scripts/openapi.json
-   make codegen     # Export OpenAPI schema and regenerate @vitalcer/api client
-   make codegen-watch # Watch server/ and continuously regenerate @vitalcer/api client
-   ```
-   > **Network Ports (WireGuard / Local)**:
-   > - **FastAPI Backend**: `http://10.100.0.1:8000` (or `http://localhost:8000`)
-   > - **Admin Backoffice**: `http://10.100.0.1:5173` (or `http://localhost:5173`)
-   > - **Mobile POS**: `https://10.100.0.1:5174` (HTTPS via `basic-ssl`, required for phone camera `getUserMedia`)
-
-
-2. **Via Devenv Scripts Directly**:
-   All scripts defined in `devenv.nix` are available in `.devenv/profile/bin/` (or inside `devenv shell`):
-   ```bash
-   dev, dev-admin (or dev:admin), dev-pos (or dev:pos), db
-   lint, fix, format (or :be / :fe)
-   typecheck (ty), typecheck:strict (basedpyright)
-   test (pytest), test:fe, test:all
-   check (full monorepo), check:be, check:fe, check-admin, check-pos
-   build, build-admin, build-pos
-   openapi, codegen (or api:generate), codegen-watch (or codegen:watch)
-   ```
-
-3. **Prepend PATH in Shell Commands**:
-   ```bash
-   PATH="$PWD/.devenv/profile/bin:$PATH" check
-   PATH="$PWD/.devenv/profile/bin:$PATH" uv run pytest
-   PATH="$PWD/.devenv/profile/bin:$PATH" pnpm install
-   ```
-
-4. **Via `devenv shell`**:
-   ```bash
-   devenv shell <command>
-   ```
+This repository is **Vitalcer**, a single-store dietetic store management system (*dietética*) handling **discrete unit goods** (packaged cookies, supplements, beverages) and **continuous bulk goods** (nuts, seeds, flours sold by weight with embedded-weight GS1 EAN-13 scale barcodes `20PPPPPWWWWWC`).
 
 ---
 
-## 2. Monorepo Structure
+## 1. Tooling & Agent Update Invariant (STRICT)
+
+> **Mandatory Rule for AI Agents**:
+> Every time you touch or modify anything related to tooling (Nix, `devenv.nix`, packages, scripts, processes, ports, Docker, dev workflow, build configuration, linters, or proxies), you **MUST** record the change in the **Tooling & Infrastructure Ledger** (Section 6) of this file (`AGENTS.md`).
+> Furthermore, this file is the **single, super-compressed technical source of truth** for project architecture, commands, directories, domain invariants, and live status. Keep it concise, high-density, and LLM-friendly.
+
+---
+
+## 2. Environment, Ports & Unified Process Execution
+
+All developer tools are provisioned hermetically via **Nix (`devenv.nix`)** into `.devenv/profile/bin/`.
+
+### Network Ports & Topology
+| Service | Local / WireGuard URL | Port | Protocol & Notes |
+| :--- | :--- | :--- | :--- |
+| **PostgreSQL 18** | `localhost:5432` | `5432` | Native devenv service (`vitalcer:vitalcer@localhost:5432/vitalcer`) |
+| **FastAPI Backend** | `http://localhost:8000` (`http://10.100.0.1:8000`) | `8000` | HTTP / REST API (`/api/v1`) |
+| **Admin Backoffice** | `http://localhost:5173` (`http://10.100.0.1:5173`) | `5173` | HTTP (Static SPA via Vite) |
+| **Mobile POS App** | `https://localhost:5174` (`https://10.100.0.1:5174`) | `5174` | **HTTPS** (`basic-ssl` required for phone camera `getUserMedia`) |
+
+### Unified Process Execution (`devenv up`)
+`devenv up` (and `make up`) manages **ALL 5 services concurrently** via `process-compose`:
+1. `postgres`: PostgreSQL 18 native service
+2. `server`: FastAPI with hot reload (`uvicorn server.main:app --reload --host 0.0.0.0 --port 8000`)
+3. `codegen`: Automatic OpenAPI client watcher (`watchfiles` -> `@vitalcer/api`)
+4. `admin`: Admin Backoffice SPA (`pnpm --filter admin dev`)
+5. `pos`: Cashier Counter SPA (`pnpm --filter pos dev`)
+
+### Primary Developer Commands
+```bash
+make up          # Start all 5 services concurrently (postgres, server, codegen, admin, pos)
+make dev         # Run FastAPI backend in isolation (0.0.0.0:8000)
+make dev-admin   # Run Admin SPA in isolation (0.0.0.0:5173)
+make dev-pos     # Run Mobile POS SPA in isolation (0.0.0.0:5174, HTTPS)
+make db          # Start Docker PostgreSQL fallback
+make lint        # Run ruff check . && biome check .
+make fix         # Fix lint errors & format (ruff + biome)
+make format      # Auto-format (ruff format . && biome format)
+make typecheck   # Fast typecheck (ty check)
+make test        # Run pytest test suite (SQLite in-memory test harness)
+make check       # Full validation: ruff, ty, pytest, codegen, biome, svelte-check, vitest
+make build       # Prerender & build all frontend static SPAs (admin & pos)
+make openapi     # Export backend OpenAPI schema to scripts/openapi.json
+make codegen     # Export OpenAPI & regenerate @vitalcer/api client
+```
+
+---
+
+## 3. Monorepo Structure
 
 ```
 ├── server/                     # FastAPI + SQLModel modular monolith backend
 │   ├── main.py                 # FastAPI application factory & routers
-│   ├── models/                 # SQLModel database tables (Product, User, InventoryLedger)
+│   ├── api/v1/endpoints/       # users.py, products.py, inventory.py
+│   ├── models/                 # SQLModel tables (Product, User, InventoryLedger)
 │   ├── schemas/                # Pydantic request/response validation schemas
 │   ├── services/               # Business logic (inventory calculations, barcode parsing)
 │   ├── core/                   # db.py (PostgreSQL / SQLite), config.py, dependencies.py
-│   └── api/v1/                 # Endpoints (/products, /inventory, /users)
+│   └── utils/barcode.py        # GS1 scale embedded-weight barcode parser
 ├── apps/
-│   ├── pos/                    # Cashier counter SPA (SvelteKit static, barcode/keyboard-first)
-│   └── admin/                  # Backoffice SPA (SvelteKit static, deliveries & cierre de caja)
+│   ├── pos/                    # Mobile Cashier Counter SPA (SvelteKit static, HTTPS port 5174)
+│   │   ├── src/lib/camera/     # Dual-engine barcode scanner (native BarcodeDetector + ZXing fallback)
+│   │   ├── src/lib/cart/       # Cart state machine in Svelte 5 Runes ($state, discrete & bulk ARS)
+│   │   ├── src/lib/checkout/   # Cash (change calc), Card, QR MP checkout modal committing batch sales
+│   │   └── src/lib/audio/      # Web Audio scanner beeps & buzzer error tones
+│   └── admin/                  # Operations & Backoffice SPA (SvelteKit static, port 5173)
+│       ├── src/routes/         # Catalog with 60 FPS @tanstack/svelte-virtual table & product editor
+│       ├── src/routes/sales/   # POS sales dashboard (KPI cards, grouped tickets, itemized receipts)
+│       ├── src/routes/actions/ # Stock replenishment, shrinkage merma logging, manual adjustments
+│       └── src/routes/ledger/  # Double-entry inventory audit ledger with filters
 ├── packages/
-│   ├── api/                    # Generated @hey-api client, Zod schemas, TanStack Query options
-│   ├── ui/                     # Shared Tailwind CSS v4 & Bits UI / shadcn-svelte primitives
-│   └── core/                  # EAN-13 embedded barcode parser, whole ARS & weight formatters
-├── scripts/
-│   └── api_export.py           # Exports backend OpenAPI spec to scripts/openapi.json
-├── Makefile                    # Standard build & check targets (with .devenv in PATH)
-├── devenv.nix                  # Nix toolchain definition
-└── SPECIFICATION.md            # Deep system architecture & domain specification
+│   ├── api/                    # Centralized @hey-api client, Zod schemas, TanStack Query options
+│   ├── ui/                     # Shared Tailwind CSS v4 tokens (@source enabled) & Bits UI primitives
+│   └── core/                   # EAN-13 embedded barcode parser, whole ARS & weight formatters
+├── scripts/api_export.py       # OpenAPI exporter
+├── Makefile                    # Make targets forwarding to .devenv/profile/bin
+├── devenv.nix                  # Hermetic Nix environment & process-compose runner
+└── SPECIFICATION.md            # Deep system architecture & domain specification (read on-demand only)
 ```
 
 ---
 
-## 3. Critical Rules for AI Agents
+## 4. Critical Architecture & Domain Invariants
 
-1. **Token Efficiency**: Do **NOT** read `SPECIFICATION.md` or large source trees upfront. Only consult `SPECIFICATION.md` on-demand when implementing domain rules (EAN-13 barcode parsing, double-entry inventory ledger movements, substitution workflows).
-2. **Currency**: All prices are stored as **integers in whole Argentine Pesos (ARS)** (e.g. $1,500 ARS = `1500`). Cents/centavos are strictly omitted.
-3. **Double-Entry Inventory**: Stock balances in `products` are never overwritten directly; all adjustments require an `InventoryLedger` entry (`quantity_delta`, `movement_type`, `balance_after`).
-4. **Static SPAs**: Both frontend applications in `apps/` must remain pure static SPAs (`ssr = false`) with zero Node.js server dependencies in production.
-5. **HTTPS & Camera Access**: `apps/pos` is served over **HTTPS** via `@vitejs/plugin-basic-ssl` on port `5174` because browsers enforce the W3C Secure Context rule for `navigator.mediaDevices.getUserMedia`. Do not downgrade it to plain HTTP.
-6. **Tailwind CSS v4 `@source`**: All shared components in `packages/ui` must be explicitly discovered via `@source "./"` in `packages/ui/src/theme.css` so that Tailwind includes utilities from shared packages in the client CSS builds.
-7. **Mobile-First Modals & Dialogs**: All modals in `@vitalcer/ui` must render through a portal with a backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile screens (`< sm`) with internal scrolling and fixed actions, and center on desktop viewports (`sm:`).
+1. **Token Efficiency**: Do **NOT** read `SPECIFICATION.md` or large source trees upfront. Only consult `SPECIFICATION.md` on-demand for complex domain rules.
+2. **Currency**: All prices are stored and calculated as **integers in whole Argentine Pesos (ARS)** (e.g. $1,500 ARS = `1500`). Cents/centavos are strictly forbidden.
+3. **Double-Entry Inventory**: Stock balances in `products` are **never** overwritten directly; all adjustments require an immutable `InventoryLedger` entry (`quantity_delta`, `movement_type`, `balance_after`, `reference_id`).
+4. **Static SPAs**: Both frontend applications in `apps/` must remain pure static SPAs (`ssr = false`, `@sveltejs/adapter-static`) with zero Node.js server dependencies in production.
+5. **HTTPS & Camera Access**: `apps/pos` must be served over **HTTPS** (port `5174`) because browsers require a W3C Secure Context for `navigator.mediaDevices.getUserMedia`.
+6. **Tailwind CSS v4 `@source`**: All shared components in `packages/ui` must be explicitly discovered via `@source "./"` in `packages/ui/src/theme.css`.
+7. **Mobile-First Modals**: Modals in `@vitalcer/ui` render via portal with backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile (`< sm`) with internal scrolling and fixed actions, and center on desktop (`sm:`).
+
+---
+
+## 5. Implementation Status & Roadmap
+
+- ✅ **Phase 1 (Data & Models)**: SQLModel database (`Product`, `User`, `InventoryLedger`), whole ARS integers, dual Postgres/SQLite test harness.
+- ✅ **Phase 2 (Mobile POS Cashier)**: Barcode camera scanner with GPU detector, cart state machine in Svelte 5 runes, Web Audio tones, Cash change calculation & payment modal, atomic batch checkout committing to ledger (`movement_type = 'sale_pos'`).
+- ✅ **Phase 3 (Inventory & Backoffice)**: Append-only double-entry engine (`/receive`, `/merma`, `/adjust`, `/reserve`, `/fulfill`, `/audit`), Admin catalog with `@tanstack/svelte-virtual` table, stock operations (`/actions`), ledger audit (`/ledger`), and sales dashboard (`/sales`).
+- ⏳ **Phase 4 (Deliveries - Next)**: Multi-platform delivery orchestration (PedidosYa, Rappi, VGO, MercadoLibre), virtual stock reservation sync, live picking UI with substitution.
+- ⏳ **Phase 5 (Financial Closing)**: Cierre de Caja (`/reports/cierre`), physical cash count (*Arqueo de caja*), daily shrinkage write-off.
+- ⏳ **Infrastructure**: Caddy reverse proxy integration (pre-compressed Brotli/zstd at build-time, automatic internal TLS).
+
+---
+
+## 6. Tooling & Infrastructure Ledger
+
+| Date | Change Summary | Affected Components |
+| :--- | :--- | :--- |
+| **2026-10-07** | Unified `admin` and `pos` dev servers into `devenv up` via `processes` in `devenv.nix`. All 5 services (Postgres, FastAPI, Codegen watcher, Admin, POS) now start with a single `make up` / `devenv up`. | `devenv.nix`, `Makefile` |
+| **2026-10-07** | Unified `CONTEXT.md` into `AGENTS.md`. Established strict tooling update invariant rule for AI agents. | `AGENTS.md`, `CONTEXT.md` |

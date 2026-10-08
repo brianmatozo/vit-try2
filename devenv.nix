@@ -161,6 +161,8 @@
       echo "Watching server/ for API schema changes to regenerate client..."
       uv run watchfiles --filter python "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate" server/
     '';
+    admin.exec = "pnpm --filter admin dev";
+    pos.exec = "pnpm --filter pos dev";
   };
 
   # Native PostgreSQL service managed by devenv
