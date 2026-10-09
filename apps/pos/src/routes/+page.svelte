@@ -5,7 +5,12 @@ import {
 	productReadMultiApiV1ProductsGetOptions,
 	scanBarcode,
 } from '@vitalcer/api';
-import { formatARS, formatWeight, parseBarcode } from '@vitalcer/core';
+import {
+	calculateWeightFromPrice,
+	formatARS,
+	formatWeight,
+	parseBarcode,
+} from '@vitalcer/core';
 import {
 	AlertCircle,
 	Camera,
@@ -103,7 +108,11 @@ async function handleBarcodeScan(barcode: string) {
 	}
 
 	if (prod) {
-		if (prod.product_type === 'bulk' && !parsed.isEmbeddedWeight) {
+		const isScaleItem =
+			parsed.isEmbeddedScale ||
+			parsed.isEmbeddedPrice ||
+			parsed.isEmbeddedWeight;
+		if (prod.product_type === 'bulk' && !isScaleItem) {
 			activeWeightProduct = prod;
 			activeWeightItemId = null;
 			initialWeightGrams = prod.bulk_reference_grams || 100;
@@ -112,8 +121,25 @@ async function handleBarcodeScan(barcode: string) {
 			return;
 		}
 
+		let weightGrams = parsed.weightGrams;
+		let lineTotal: number | undefined;
+
+		if (parsed.isEmbeddedPrice && parsed.embeddedPriceWholeArs !== undefined) {
+			lineTotal = parsed.embeddedPriceWholeArs;
+			const refGrams =
+				prod.bulk_reference_grams && prod.bulk_reference_grams > 0
+					? prod.bulk_reference_grams
+					: 100;
+			weightGrams = calculateWeightFromPrice(
+				prod.unit_price,
+				refGrams,
+				lineTotal,
+			);
+		}
+
 		cart.addItem(prod, {
-			weightGrams: parsed.weightGrams,
+			weightGrams,
+			lineTotal,
 			rawBarcode: parsed.rawBarcode,
 		});
 
@@ -146,6 +172,7 @@ async function handleBarcodeScan(barcode: string) {
 
 			cart.addItem(serverProd, {
 				weightGrams: scanResult.weight_grams ?? undefined,
+				lineTotal: scanResult.line_total,
 				rawBarcode: scanResult.raw_barcode,
 			});
 

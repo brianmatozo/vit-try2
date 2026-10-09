@@ -1,7 +1,7 @@
 DEVENV_BIN := $(CURDIR)/.devenv/profile/bin
 export PATH := $(DEVENV_BIN):$(PATH)
 
-.PHONY: up dev dev-admin dev-pos db lint format fix test check typecheck openapi codegen codegen-watch build build-admin build-pos
+.PHONY: up dev dev-admin dev-pos db lint format fix test check typecheck openapi codegen codegen-watch build build-admin build-pos serve caddy-validate caddy-reload
 
 up:
 	@devenv up
@@ -53,5 +53,14 @@ build-admin: codegen
 
 build-pos: codegen
 	@$(DEVENV_BIN)/build-pos
+
+serve: build
+	@$(DEVENV_BIN)/serve
+
+caddy-validate:
+	@$(DEVENV_BIN)/caddy:validate
+
+caddy-reload:
+	@$(DEVENV_BIN)/serve:reload
 
 

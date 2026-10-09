@@ -11,19 +11,25 @@ class TestBarcodeParser:
         assert result.raw_barcode == "200142003507"
 
     def test_parse_embedded_scale_barcode_13_digits(self):
-        # Format with 13 digits (standard EAN-13 check digit structure)
-        result = parse_barcode("2001420035070")
+        # Real-world label: 20 (prefix) 2126 (PLU) 014400 ($14.400 ARS) 4 (check digit)
+        result = parse_barcode("2021260144004")
+        assert result.is_embedded_scale is True
+        assert result.is_embedded_price is True
         assert result.is_embedded_weight is True
-        assert result.sku_or_plu == "0142"
-        assert result.weight_grams == 350
+        assert result.sku_or_plu == "2126"
+        assert result.embedded_price_whole_ars == 14400
+        assert result.weight_grams is None
+        assert result.raw_barcode == "2021260144004"
 
     def test_in_store_prefixes(self):
         for prefix in ["20", "21", "28", "29"]:
-            barcode = f"{prefix}9999015000"
+            barcode = f"{prefix}99990150000"
             result = parse_barcode(barcode)
+            assert result.is_embedded_scale is True
+            assert result.is_embedded_price is True
             assert result.is_embedded_weight is True
             assert result.sku_or_plu == "9999"
-            assert result.weight_grams == 1500
+            assert result.embedded_price_whole_ars == 15000
 
     def test_parse_discrete_retail_barcode(self):
         # Standard Argentine EAN-13 retail prefix 779...

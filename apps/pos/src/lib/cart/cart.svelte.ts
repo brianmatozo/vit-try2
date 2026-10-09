@@ -34,6 +34,7 @@ export class CartState {
 		product: ProductResponse,
 		options?: {
 			weightGrams?: number;
+			lineTotal?: number;
 			rawBarcode?: string;
 			quantity?: number;
 		},
@@ -48,11 +49,9 @@ export class CartState {
 				product.bulk_reference_grams && product.bulk_reference_grams > 0
 					? product.bulk_reference_grams
 					: 100;
-			const lineTotal = calculateBulkLineTotal(
-				product.unit_price,
-				refGrams,
-				weightGrams,
-			);
+			const lineTotal =
+				options?.lineTotal ??
+				calculateBulkLineTotal(product.unit_price, refGrams, weightGrams);
 
 			const newItem: CartItem = {
 				id:

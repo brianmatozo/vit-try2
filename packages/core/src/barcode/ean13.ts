@@ -38,13 +38,13 @@ export function isValidEan13(code: string): boolean {
 }
 
 /**
- * Parse raw barcode string into discrete SKU or scale-embedded PLU & weight.
+ * Parse raw barcode string into discrete SKU or scale-embedded PLU & price/weight.
  * Matches backend server/utils/barcode.py behavior:
- * Format: PP IIII WWWWW C (12 or 13 digits)
+ * Format: PP IIII VVVVVV C (13 digits) or PP IIII VVVVV C (12 digits)
  * - PP: In-store prefix (20, 21, 28, 29)
  * - IIII: 4-digit PLU code
- * - WWWWW: 5-digit weight in grams
- * - C: Optional check digit
+ * - VVVVVV: 6-digit payload (standard Argentine scales encode Total Price in whole ARS)
+ * - C: Check digit
  */
 export function parseBarcode(raw: string): ParsedBarcode {
 	const clean = raw.trim();
@@ -53,20 +53,40 @@ export function parseBarcode(raw: string): ParsedBarcode {
 		const prefix = clean.substring(0, 2);
 		if (IN_STORE_PREFIXES.has(prefix)) {
 			const plu = clean.substring(2, 6);
+
+			if (clean.length === 13) {
+				const priceRaw = clean.substring(6, 12);
+				const priceVal = Number.parseInt(priceRaw, 10);
+				return {
+					rawBarcode: clean,
+					isEmbeddedScale: true,
+					isEmbeddedPrice: true,
+					isEmbeddedWeight: true, // Keep true for compatibility with scale-item handlers
+					skuOrPlu: plu,
+					embeddedPriceWholeArs: priceVal,
+				};
+			}
+
+			// 12-digit format fallback
 			const weightRaw = clean.substring(6, 11);
 			const weightGrams = Number.parseInt(weightRaw, 10);
 
 			return {
 				rawBarcode: clean,
+				isEmbeddedScale: true,
+				isEmbeddedPrice: false,
 				isEmbeddedWeight: true,
 				skuOrPlu: plu,
 				weightGrams: weightGrams,
+				embeddedPriceWholeArs: weightGrams,
 			};
 		}
 	}
 
 	return {
 		rawBarcode: clean,
+		isEmbeddedScale: false,
+		isEmbeddedPrice: false,
 		isEmbeddedWeight: false,
 		skuOrPlu: clean,
 	};

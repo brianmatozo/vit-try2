@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatARS, parseARS } from './currency.js';
-import { calculateBulkLineTotal } from './pricing.js';
+import { calculateBulkLineTotal, calculateWeightFromPrice } from './pricing.js';
 import { formatWeight } from './weight.js';
 
 describe('Formatters and Calculations', () => {
@@ -52,6 +52,27 @@ describe('Formatters and Calculations', () => {
 
 		it('throws if reference grams is zero or negative', () => {
 			expect(() => calculateBulkLineTotal(1000, 0, 100)).toThrow();
+		});
+	});
+
+	describe('calculateWeightFromPrice', () => {
+		it('calculates physical weight from scale embedded price in whole ARS', () => {
+			// Nuez x500g: unitPrice = 2880 ARS per 100g, label price = 14400 ARS
+			// Weight = (14400 / 2880) * 100 = 500 grams
+			const weight = calculateWeightFromPrice(2880, 100, 14400);
+			expect(weight).toBe(500);
+		});
+
+		it('rounds to nearest integer grams for fractional divisions', () => {
+			// 123g @ $2490 / 100g -> scale printed 3063 ARS
+			// Reverse: round((3063 / 2490) * 100) = 123g
+			const weight = calculateWeightFromPrice(2490, 100, 3063);
+			expect(weight).toBe(123);
+		});
+
+		it('returns 0 if price or unitPrice is zero or negative', () => {
+			expect(calculateWeightFromPrice(0, 100, 14400)).toBe(0);
+			expect(calculateWeightFromPrice(2880, 0, 14400)).toBe(0);
 		});
 	});
 });

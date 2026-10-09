@@ -169,38 +169,58 @@ The USB/Bluetooth barcode scanner acts as a standard **Keyboard Human Interface 
 // apps/pos/src/lib/barcode/ean13Parser.ts
 
 export interface ParsedBarcode {
-  isEmbeddedWeight: boolean;
   rawBarcode: string;
+  isEmbeddedScale: boolean;
+  isEmbeddedPrice: boolean;
+  isEmbeddedWeight: boolean;
   skuOrPlu: string;
+  embeddedPriceWholeArs?: number;
   weightGrams?: number;
 }
 
 export function parseBarcode(raw: string): ParsedBarcode {
   const clean = raw.trim();
 
-  // Validate 13 digits
-  if (/^\d{13}$/.test(clean)) {
+  // Validate 13 or 12 digits
+  if ((clean.length === 12 || clean.length === 13) && /^\d+$/.test(clean)) {
     const prefix = clean.substring(0, 2);
     
-    // In-store prefix list (typical Argentine & international retail standards)
+    // In-store prefix list (typical Argentine retail standards: 20, 21, 28, 29)
     if (['20', '21', '28', '29'].includes(prefix)) {
-      const plu = clean.substring(2, 6);       // 4-digit PLU
-      const weightRaw = clean.substring(6, 11); // 5-digit weight in grams
-      const weightGrams = parseInt(weightRaw, 10);
+      const plu = clean.substring(2, 6); // 4-digit PLU
+      
+      if (clean.length === 13) {
+        // Standard Argentine scale firmware encodes Total Price in whole ARS (6 digits)
+        const priceVal = parseInt(clean.substring(6, 12), 10);
+        return {
+          rawBarcode: clean,
+          isEmbeddedScale: true,
+          isEmbeddedPrice: true,
+          isEmbeddedWeight: true,
+          skuOrPlu: plu,
+          embeddedPriceWholeArs: priceVal,
+        };
+      }
 
+      const val = parseInt(clean.substring(6, 11), 10);
       return {
-        isEmbeddedWeight: true,
         rawBarcode: clean,
+        isEmbeddedScale: true,
+        isEmbeddedPrice: false,
+        isEmbeddedWeight: true,
         skuOrPlu: plu,
-        weightGrams: weightGrams,
+        weightGrams: val,
+        embeddedPriceWholeArs: val,
       };
     }
   }
 
   // Standard discrete barcode (e.g. 779... cookies)
   return {
-    isEmbeddedWeight: false,
     rawBarcode: clean,
+    isEmbeddedScale: false,
+    isEmbeddedPrice: false,
+    isEmbeddedWeight: false,
     skuOrPlu: clean,
   };
 }
@@ -208,12 +228,14 @@ export function parseBarcode(raw: string): ParsedBarcode {
 
 **POS Action Flow:**
 
-1. Scanner triggers keystrokes into POS window.
-2. POS intercepts `Enter`, passes raw string to `parseBarcode()`.
-3. If `isEmbeddedWeight == true`:
-   * Looks up product by `plu_code == "0142"`.
-   * Computes line total: `Math.round((unit_price / bulk_reference_grams) * weightGrams)`.
-   * Adds line item: `Raw Almonds - 350g @ $1,500/100g = $5,250`.
+1. Scanner triggers keystrokes or camera scans barcode.
+2. Intercepts code, passes raw string to `parseBarcode()`.
+3. If `isEmbeddedPrice == true`:
+   * Looks up bulk product by `plu_code == "2126"`.
+   * Line total charged is the exact embedded price: e.g. `$14,400 ARS`.
+   * Reverse-calculates physical weight: `Math.round((price / unit_price) * bulk_reference_grams) = 500g`.
+   * Adds line item: `Nuez - 500g @ $2.880/100g = $14.400`.
+   * Checkout ledger deducts exact physical weight: `-500g`.
 4. If `isEmbeddedWeight == false`:
    * Looks up product by `sku`.
    * Adds 1 discrete unit to cart.
@@ -254,13 +276,13 @@ $$\text{Virtual Stock} = \max(0, \text{Current Stock} - \text{Reserved Stock} - 
 * Published to PedidosYa/Rappi: `700g` (The platform will reject orders exceeding 700g, safeguarding in-store inventory).
 * If stock drops below `Safety Buffer`, the sync worker immediately sends an API call: **`PAUSE_ITEM`** / **`OUT_OF_STOCK`**.
 
-### 5.3 Order Lifecycle & Substitution State Machine
+### 5.3 Order Lifecycle & Shortage State Machine
 
 When an online delivery order requests an item that is physically unavailable or depleted:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Ingested: Webhook / Polling from PedidosYa/Rappi/VGO
+    [*] --> Ingested: Webhook / Polling from Delivery Platform
     Ingested --> Reserved: Stock held with 15-min TTL
     Reserved --> InPicking: Store operator prepares order
 
@@ -270,35 +292,44 @@ stateDiagram-v2
         CheckItems --> ItemShortage: Scooped out / missing
     }
 
-    ItemShortage --> SubstitutionPending: Staff clicks "Reemplazo"
-    
-    state SubstitutionPending {
-        [*] --> CallCustomer: Staff contacts customer
-        CallCustomer --> Accepted: Agrees to replacement product
-        CallCustomer --> Rejected: Wants refund / item removal
+    state "v1: Lean Shortage Handling" as V1 {
+        ItemShortage --> ItemRemoved: Operator marks "Sin Stock / Quitar"
+        ItemRemoved --> ReservationReleased: Release stock reservation
+        ReservationReleased --> RecalculateSubtotal: Deduct line & update total
     }
 
-    Accepted --> Recalculated: Swap item in cart + recalculate subtotal
-    Rejected --> Recalculated: Remove line item + adjust subtotal
+    state "v2: Advanced Substitution Engine" as V2 {
+        ItemShortage --> SuggestAlternatives: System suggests related in-stock items
+        SuggestAlternatives --> CustomerApproval: Operator calls customer / in-app swap
+        CustomerApproval --> ItemSwapped: Customer accepts (price delta applied)
+        CustomerApproval --> ItemRemoved: Customer rejects (refund item)
+    }
 
-    Recalculated --> InPicking: Pick replacement item
+    RecalculateSubtotal --> ReadyForDispatch: Order packed & labeled
+    ItemSwapped --> ReadyForDispatch: Replacement packed
     AllAvailable --> ReadyForDispatch: Order packed & labeled
     ReadyForDispatch --> Dispatched: Courier picks up bag
     Dispatched --> Fulfilled: Completed in platform
     Fulfilled --> [*]
 ```
 
-### 5.4 Handling Substitutions in the System
+### 5.4 Handling Item Shortages & Substitutions (Staged Implementation)
 
-1. **Operator Alert**: The POS/Admin sounds an audible alarm and flashes `CONFLICT: Order #1042 Almonds 1000g unavailable`.
-2. **One-Click Suggestion Engine**:
-   * The UI displays related items in stock (e.g., *Walnuts*, *Smoked Almonds*, *Cashews*).
-3. **Difference Calculation**:
-   * Original: `1000g Almonds = $12,000`
-   * Replacement: `1000g Cashews = $14,500` (Difference: `+$2,500`)
-4. **Platform Action**:
-   * For **PedidosYa / Rappi**: The backend calls the platform's order modification endpoint (`POST /orders/{id}/items/replace` or adjust order API) or prompts the cashier for payment adjustment per platform rules.
-   * The Inventory Ledger releases the reservation on `Almonds` and reserves `1000g Cashews`.
+To avoid excessive upfront complexity and prevent blocked orders during store rush hours, item shortages are tackled in two evolutionary stages:
+
+#### Stage 1: v1 Out-of-Stock / Removal Switch (Phase 4A Core)
+1. **Operator Shortage Action**: When weighing or bagging an item that is depleted, the operator clicks **"Sin Stock / Quitar"** directly on the picking checklist item.
+2. **Immediate Ledger Release**: The backend immediately calls `release_stock(...)` to cancel the virtual reservation on that product, freeing up ledger balance and adjusting current stock accounting.
+3. **Automatic Subtotal Deduction**: The order line is marked as `removed`, and the order total is automatically reduced.
+4. **Immediate Catalog Auto-Pause**: The system marks the product as out of stock and triggers `pause_product(...)` via the adapter to prevent subsequent online orders.
+
+#### Stage 2: v2 Advanced Substitution Engine (Phase 4B Post-Launch)
+1. **Operator Alert**: Visual conflict notification and audible tone for missing bulk or unit goods.
+2. **One-Click Suggestion Engine**: UI suggests related in-stock items (e.g., *Cashews* replacing *Almonds*).
+3. **Price Delta Calculation**:
+   * Original: `1000g Almonds = $12,000 ARS`
+   * Replacement: `1000g Cashews = $14,500 ARS` (Difference: `+$2,500 ARS`)
+4. **Platform & Ledger Swap**: Calls platform-specific order modification API (`POST /orders/{id}/items/replace`), releases reservation on the original SKU, and reserves the replacement SKU in `InventoryLedger`.
 
 ---
 
@@ -341,18 +372,28 @@ class DeliveryAdapter(ABC):
         pass
 
     @abstractmethod
+    async def remove_order_item(self, platform_order_id: str, item_id: str) -> bool:
+        """Notifies platform of an out-of-stock item removal (v1 lean flow)."""
+        pass
+
     async def modify_order_item(
         self, platform_order_id: str, old_item_id: str, new_item_id: str, new_qty: int
     ) -> bool:
-        """Communicates replacement/substitution to platform."""
-        pass
+        """Communicates replacement/substitution to platform (v2 advanced flow)."""
+        raise NotImplementedError("Advanced substitution will be enabled in v2")
 ```
 
 ### 6.2 Platform Profiles & Specifics
 
-| Platform | Ingestion Method | Stock Sync Protocol | Substitution Capability | Notes |
+> **Bureaucracy & API Onboarding Strategy**:
+> Obtaining official API credentials, merchant partner keys, and production webhook whitelisting from delivery providers (PedidosYa, Rappi, etc.) involves significant legal and administrative lead time.
+> Therefore, **Phase 4A** builds and fully tests the internal orchestration against a fully compliant **Mock Delivery Adapter**.
+> Once credentials are approved, **Phase 4B** rolls out concrete adapters **one platform at a time**, starting with the provider the business has direct, immediate account access for.
+
+| Platform | Ingestion Method | Stock Sync Protocol | Shortage & Substitution Capability | Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **PedidosYa** | Inbound Webhooks | Menu / Catalog API (Batch or Item PUT) | Supported via Partner API | High volume, strict dispatch timers. |
+| **Mock Adapter** | Local test runner / Webhook simulator | In-memory stock state | v1 Item Removal + v2 Swapping | Phase 4A development & automated integration tests. |
+| **PedidosYa** | Inbound Webhooks | Menu / Catalog API (Batch or Item PUT) | Supported via Partner API | High volume, strict dispatch timers. Primary food partner candidate. |
 | **Rappi** | Inbound Webhooks + Polling fallback | Catalog Stock Sync API | Supported via Rappi Merchant API | Requires immediate acoustic notifications in POS. |
 | **VGO** | Webhook or Polling (every 30s) | REST Inventory Endpoint | Manual phone confirmation + order PATCH | Local delivery platform; simpler API surface. |
 | **MercadoLibre** | Notifications Webhook (`/orders/v1`) | Items API (`PUT /items/{id}`) | Cancellation or message resolution | Lower velocity than food apps, but severe penalties for stockout cancellations. |
@@ -605,15 +646,22 @@ Dietetic stores manage mixed cash, card, and app payouts. At the end of every bu
 * [x] Build immutable audit trail ledger table with movement type filters and pagination (`apps/admin/src/routes/ledger/+page.svelte`).
 * [x] Build product catalog manager with `@tanstack/svelte-virtual` (60 FPS scrolling) and responsive mobile bottom-sheet / desktop dialog.
 
-### Phase 4: Delivery Integrations & Orchestration
+### Phase 4A: Delivery Core, Virtual Buffers & Live Picking (Internal & Mock Driven)
 
-* [ ] Define `DeliveryOrder` and `DeliveryOrderItem` SQLModel tables.
-* [ ] Implement `DeliveryAdapter` unified abstract interface (`update_catalog_stock`, `pause_product`, `ingest_order`, `modify_order_item`).
-* [ ] Build Mock Delivery Adapter for end-to-end webhook/order simulation.
-* [ ] Implement virtual stock synchronization ($\text{Virtual Stock} = \max(0, \text{Stock} - \text{Reserved} - \text{Buffer})$).
-* [ ] Build Live Order Picking screen (`apps/admin/src/routes/deliveries`) with acoustic dispatch alerts.
-* [ ] Implement clerk Conflict & Substitution workflow (suggest alternatives, calculate price delta, recalculate subtotal).
-* [ ] Implement concrete PedidosYa, Rappi, and VGO adapters.
+* [ ] Define `DeliveryOrder` and `DeliveryOrderItem` SQLModel tables with status lifecycle (`ingested`, `reserved`, `in_picking`, `ready_for_dispatch`, `dispatched`, `fulfilled`, `cancelled`).
+* [ ] Implement `DeliveryAdapter` unified abstract interface (`update_catalog_stock`, `pause_product`, `ingest_order`, `remove_order_item`, `modify_order_item`).
+* [ ] Build Mock Delivery Adapter for end-to-end webhook/order simulation & automated test fixtures.
+* [ ] Implement virtual stock synchronization ($\text{Virtual Stock} = \max(0, \text{Stock} - \text{Reserved} - \text{Buffer})$) with automatic product pausing.
+* [ ] Build Live Order Picking screen (`apps/admin/src/routes/deliveries`) with acoustic dispatch alerts and item checklist.
+* [ ] Implement v1 Item Shortage Workflow: Simple "Sin Stock / Quitar" switch (releases reserved stock, deducts line from subtotal, updates order).
+* [ ] Full automated test suite verifying order lifecycle, stock reservation release, and mock webhook ingestion.
+
+### Phase 4B: Concrete Platform Integrations & Bureaucracy (Incremental Rollout)
+
+* [ ] Implement concrete adapter for primary delivery partner (the platform the store has immediate credentials/access for).
+* [ ] Bureaucratic integration & sandbox certification (webhook endpoint configuration, OAuth token exchange, partner rate limits).
+* [ ] Incrementally add secondary platform adapters (PedidosYa, Rappi, VGO, MercadoLibre) as credentials and API access become available.
+* [ ] (v2 Enhancement) Advanced Substitution Engine: alternative product suggestions, price delta calculation, and cart item swapping.
 
 ### Phase 5: Dashboard & Financial Closing ("Cierre de Caja")
 

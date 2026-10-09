@@ -19,3 +19,23 @@ export function calculateBulkLineTotal(
 	}
 	return Math.round((unitPriceWholeArs / bulkReferenceGrams) * weightGrams);
 }
+
+/**
+ * Reverse-calculates physical weight in grams from embedded label price in whole ARS.
+ *
+ * Example:
+ * unitPriceWholeArs = 2880 ($2.880 per 100g)
+ * bulkReferenceGrams = 100
+ * priceWholeArs = 14400 ($14.400 total label price)
+ * Total weight = round((14400 / 2880) * 100) = 500 grams
+ */
+export function calculateWeightFromPrice(
+	unitPriceWholeArs: number,
+	bulkReferenceGrams: number,
+	priceWholeArs: number,
+): number {
+	if (unitPriceWholeArs <= 0 || bulkReferenceGrams <= 0) {
+		return 0;
+	}
+	return Math.round((priceWholeArs / unitPriceWholeArs) * bulkReferenceGrams);
+}

@@ -32,7 +32,11 @@ async def scan_barcode(
     db: AsyncSession = Depends(get_async_db),
 ) -> ProductScanResult:
     parsed = parse_barcode(barcode)
-    if parsed.is_embedded_weight:
+    if (
+        parsed.is_embedded_scale
+        or parsed.is_embedded_price
+        or parsed.is_embedded_weight
+    ):
         stmt = (
             select(Product)
             .options(noload("*"))
@@ -44,8 +48,20 @@ async def scan_barcode(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Bulk product with PLU code '{parsed.sku_or_plu}' not found",
             )
-        weight = parsed.weight_grams or 0
-        line_total = round((product.unit_price / product.bulk_reference_grams) * weight)
+        ref_grams = (
+            product.bulk_reference_grams if product.bulk_reference_grams > 0 else 100
+        )
+        if parsed.is_embedded_price and parsed.embedded_price_whole_ars is not None:
+            line_total = parsed.embedded_price_whole_ars
+            weight = (
+                round((line_total / product.unit_price) * ref_grams)
+                if product.unit_price > 0
+                else 0
+            )
+        else:
+            weight = parsed.weight_grams or 0
+            line_total = round((product.unit_price / ref_grams) * weight)
+
         return ProductScanResult(
             raw_barcode=parsed.raw_barcode,
             is_embedded_weight=True,

@@ -25,16 +25,15 @@ All developer tools are provisioned hermetically via **Nix (`devenv.nix`)** into
 | **Mobile POS App** | `https://localhost:5174` (`https://10.100.0.1:5174`) | `5174` | **HTTPS** (`basic-ssl` required for phone camera `getUserMedia`) |
 
 ### Unified Process Execution (`devenv up`)
-`devenv up` (and `make up`) manages **ALL 5 services concurrently** via `process-compose`:
+`devenv up` (and `make up`) manages **ALL 4 services concurrently** via `process-compose`:
 1. `postgres`: PostgreSQL 18 native service
 2. `server`: FastAPI with hot reload (`uvicorn server.main:app --reload --host 0.0.0.0 --port 8000`)
-3. `codegen`: Automatic OpenAPI client watcher (`watchfiles` -> `@vitalcer/api`)
-4. `admin`: Admin Backoffice SPA (`pnpm --filter admin dev`)
-5. `pos`: Cashier Counter SPA (`pnpm --filter pos dev`)
+3. `admin`: Admin Backoffice SPA (`pnpm --filter admin dev`)
+4. `pos`: Cashier Counter SPA (`pnpm --filter pos dev`)
 
 ### Primary Developer Commands
 ```bash
-make up          # Start all 5 services concurrently (postgres, server, codegen, admin, pos)
+make up          # Start all 4 services concurrently (postgres, server, admin, pos)
 make dev         # Run FastAPI backend in isolation (0.0.0.0:8000)
 make dev-admin   # Run Admin SPA in isolation (0.0.0.0:5173)
 make dev-pos     # Run Mobile POS SPA in isolation (0.0.0.0:5174, HTTPS)
@@ -45,7 +44,10 @@ make format      # Auto-format (ruff format . && biome format)
 make typecheck   # Fast typecheck (ty check)
 make test        # Run pytest test suite (SQLite in-memory test harness)
 make check       # Full validation: ruff, ty, pytest, codegen, biome, svelte-check, vitest
-make build       # Prerender & build all frontend static SPAs (admin & pos)
+make build       # Prerender, build all frontend static SPAs, & precompress (Brotli/Gzip)
+make serve       # Build & serve production SPAs via Caddy (port 5173 & HTTPS 5174)
+make caddy-validate # Validate Caddyfile configuration syntax
+make caddy-reload   # Hot-reload Caddy without dropping active connections
 make openapi     # Export backend OpenAPI schema to scripts/openapi.json
 make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 ```
@@ -78,7 +80,10 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 │   ├── api/                    # Centralized @hey-api client, Zod schemas, TanStack Query options
 │   ├── ui/                     # Shared Tailwind CSS v4 tokens (@source enabled) & Bits UI primitives
 │   └── core/                   # EAN-13 embedded barcode parser, whole ARS & weight formatters
-├── scripts/api_export.py       # OpenAPI exporter
+├── scripts/
+│   ├── api_export.py           # OpenAPI exporter
+│   └── compress_static.mjs     # Build-time Level 11 Brotli & Gzip pre-compression
+├── Caddyfile                   # High-speed reverse proxy & static SPA server (internal TLS & Brotli)
 ├── Makefile                    # Make targets forwarding to .devenv/profile/bin
 ├── devenv.nix                  # Hermetic Nix environment & process-compose runner
 └── SPECIFICATION.md            # Deep system architecture & domain specification (read on-demand only)
@@ -103,9 +108,10 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 - ✅ **Phase 1 (Data & Models)**: SQLModel database (`Product`, `User`, `InventoryLedger`), whole ARS integers, dual Postgres/SQLite test harness.
 - ✅ **Phase 2 (Mobile POS Cashier)**: Barcode camera scanner with GPU detector, cart state machine in Svelte 5 runes, Web Audio tones, Cash change calculation & payment modal, atomic batch checkout committing to ledger (`movement_type = 'sale_pos'`).
 - ✅ **Phase 3 (Inventory & Backoffice)**: Append-only double-entry engine (`/receive`, `/merma`, `/adjust`, `/reserve`, `/fulfill`, `/audit`), Admin catalog with `@tanstack/svelte-virtual` table, stock operations (`/actions`), ledger audit (`/ledger`), and sales dashboard (`/sales`).
-- ⏳ **Phase 4 (Deliveries - Next)**: Multi-platform delivery orchestration (PedidosYa, Rappi, VGO, MercadoLibre), virtual stock reservation sync, live picking UI with substitution.
+- ⏳ **Phase 4A (Delivery Core & Mock Picking - Next)**: SQLModel tables (`DeliveryOrder`, `DeliveryOrderItem`), abstract `DeliveryAdapter`, virtual stock buffers & auto-pause, live picking UI (`/deliveries`) with acoustic alerts and v1 "Sin Stock / Quitar" removal switch, and mock simulation test harness.
+- ⏳ **Phase 4B (Platform Integrations & Bureaucracy)**: Incremental real platform onboarding (one at a time per merchant credentials), webhooks, and v2 advanced substitution engine.
 - ⏳ **Phase 5 (Financial Closing)**: Cierre de Caja (`/reports/cierre`), physical cash count (*Arqueo de caja*), daily shrinkage write-off.
-- ⏳ **Infrastructure**: Caddy reverse proxy integration (pre-compressed Brotli/zstd at build-time, automatic internal TLS).
+- ✅ **Infrastructure**: Caddy reverse proxy integration (pre-compressed Level 11 Brotli/Gzip at build-time, automatic internal TLS, zero-CORS API proxying, HTTP/2 & HTTP/3).
 
 ---
 
@@ -115,3 +121,5 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 | :--- | :--- | :--- |
 | **2026-10-07** | Unified `admin` and `pos` dev servers into `devenv up` via `processes` in `devenv.nix`. All 5 services (Postgres, FastAPI, Codegen watcher, Admin, POS) now start with a single `make up` / `devenv up`. | `devenv.nix`, `Makefile` |
 | **2026-10-07** | Unified `CONTEXT.md` into `AGENTS.md`. Established strict tooling update invariant rule for AI agents. | `AGENTS.md`, `CONTEXT.md` |
+| **2026-10-08** | Integrated Caddy 2 (`pkgs.caddy`) with automatic internal TLS (`tls internal`), zero-dependency build-time Brotli & Gzip pre-compression (`scripts/compress_static.mjs`), modular `Caddyfile` with snippets, and `make serve`. | `Caddyfile`, `devenv.nix`, `Makefile`, `scripts/compress_static.mjs`, `AGENTS.md` |
+| **2026-10-08** | Removed `codegen` background watcher from `processes` in `devenv.nix`. Reduced `devenv up` background services from 5 to 4. OpenAPI client codegen is run on-demand via `make codegen` (or standalone `make codegen-watch`). | `devenv.nix`, `AGENTS.md` |

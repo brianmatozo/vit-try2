@@ -36,6 +36,7 @@
 
     # System & Database utilities
     postgresql_18    # psql CLI, pg_dump, and postgres tools matching docker-compose
+    caddy            # Fast HTTP/2 & HTTP/3 web server with automatic TLS & Brotli
     pkg-config
     harlequin        # Terminal SQL IDE / DB viewer
     marksman         # Markdown LSP
@@ -57,12 +58,12 @@
     "dev:pos".exec = "pnpm --filter pos dev";
 
     # Production Builds
-    build.exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build";
-    "build:all".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build";
-    "build-admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build";
-    "build:admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build";
-    "build-pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build";
-    "build:pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build";
+    build.exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build && node scripts/compress_static.mjs";
+    "build:all".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm -r --filter './apps/*' build && node scripts/compress_static.mjs";
+    "build-admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build && node scripts/compress_static.mjs";
+    "build:admin".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter admin build && node scripts/compress_static.mjs";
+    "build-pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build && node scripts/compress_static.mjs";
+    "build:pos".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate && pnpm --filter pos build && node scripts/compress_static.mjs";
 
     # Linting & Formatting (Unified & Granular)
     lint.exec = "echo '==> Ruff linting...' && ruff check . && echo '==> Biome linting...' && biome check .";
@@ -145,6 +146,11 @@
     "api:generate".exec = "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate";
     "codegen-watch".exec = "uv run watchfiles --filter python 'uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate' server/";
     "codegen:watch".exec = "uv run watchfiles --filter python 'uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate' server/";
+
+    # Caddy Static Server & High-Speed Asset Serving
+    serve.exec = "caddy run --config Caddyfile";
+    "serve:reload".exec = "caddy reload --config Caddyfile";
+    "caddy:validate".exec = "caddy validate --config Caddyfile";
   };
 
   # Background processes managed by `devenv up`
@@ -156,10 +162,6 @@
       done
       echo "PostgreSQL is ready, starting backend server on 0.0.0.0:8000..."
       uv run uvicorn server.main:app --reload --host 0.0.0.0 --port 8000
-    '';
-    codegen.exec = ''
-      echo "Watching server/ for API schema changes to regenerate client..."
-      uv run watchfiles --filter python "uv run python scripts/api_export.py && pnpm --filter @vitalcer/api generate" server/
     '';
     admin.exec = "pnpm --filter admin dev";
     pos.exec = "pnpm --filter pos dev";
@@ -214,9 +216,12 @@
     echo "    • biome (Rust):  $(biome --version 2>/dev/null || echo 'available')"
     echo "    • svelte-lsp:    $(svelteserver --version 2>/dev/null || echo 'available')"
     echo "    • vtsls (TS LSP):$(vtsls --version 2>/dev/null || echo 'available')"
+    echo "  Web Server & Proxy:"
+    echo "    • caddy:         $(caddy version 2>/dev/null | head -n1 || echo 'available')"
     echo ""
     echo "  Commands available:"
     echo "    • Dev:       dev, dev-admin (dev:admin), dev-pos (dev:pos), db"
+    echo "    • Serve:     serve, serve:reload, caddy:validate"
     echo "    • Check:     check, check:be, check:fe, check-admin, check-pos"
     echo "    • Lint/Fix:  lint, format, fix (or :be / :fe)"
     echo "    • Typecheck: typecheck (ty), typecheck:strict (basedpyright)"

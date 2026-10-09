@@ -102,6 +102,28 @@ class TestBarcodeScannerEndpoint:
         # Subtotal: round((1500 / 100) * 350) = 5250 ARS
         assert scan_data["line_total"] == 5250
 
+    def test_scan_scale_embedded_price_13_digits(self, client: TestClient):
+        # Nuez: PLU 2126, $2.880 per 100g, label price $14.400 -> physical weight 500g
+        _create_product(
+            client,
+            sku="2127",
+            plu_code="2126",
+            name="Nueces x500g extra light",
+            unit_price=2880,
+            bulk_reference_grams=100,
+            product_type="bulk",
+        )
+
+        scan_resp = client.get("/api/v1/products/scan/2021260144004")
+        assert scan_resp.status_code == 200
+        scan_data = scan_resp.json()
+
+        assert scan_data["is_embedded_weight"] is True
+        assert scan_data["weight_grams"] == 500
+        assert scan_data["line_total"] == 14400
+        assert scan_data["product"]["plu_code"] == "2126"
+        assert scan_data["product"]["name"] == "Nueces x500g extra light"
+
     def test_scan_discrete_product(self, client: TestClient):
         _create_product(
             client,

@@ -11,19 +11,27 @@ describe('Barcode Parser (EAN-13 scale & retail)', () => {
 		expect(result.rawBarcode).toBe('200142003507');
 	});
 
-	it('parses embedded scale barcode with 13 digits', () => {
-		const result = parseBarcode('2001420035070');
+	it('parses real-world 13-digit embedded scale barcode with price', () => {
+		// 20 (prefix) 2126 (PLU) 014400 ($14.400 ARS) 4 (check digit)
+		const result = parseBarcode('2021260144004');
+		expect(result.isEmbeddedScale).toBe(true);
+		expect(result.isEmbeddedPrice).toBe(true);
 		expect(result.isEmbeddedWeight).toBe(true);
-		expect(result.skuOrPlu).toBe('0142');
-		expect(result.weightGrams).toBe(350);
+		expect(result.skuOrPlu).toBe('2126');
+		expect(result.embeddedPriceWholeArs).toBe(14400);
+		expect(result.weightGrams).toBeUndefined();
+		expect(result.rawBarcode).toBe('2021260144004');
 	});
 
-	it('recognizes all supported in-store prefixes', () => {
+	it('recognizes all supported in-store prefixes with 13-digit scale barcodes', () => {
 		for (const prefix of ['20', '21', '28', '29']) {
-			const result = parseBarcode(`${prefix}9999015000`);
+			// Prefix + PLU(9999) + Price(015000 = $15.000) + dummy check(0)
+			const result = parseBarcode(`${prefix}99990150000`);
+			expect(result.isEmbeddedScale).toBe(true);
+			expect(result.isEmbeddedPrice).toBe(true);
 			expect(result.isEmbeddedWeight).toBe(true);
 			expect(result.skuOrPlu).toBe('9999');
-			expect(result.weightGrams).toBe(1500);
+			expect(result.embeddedPriceWholeArs).toBe(15000);
 		}
 	});
 
