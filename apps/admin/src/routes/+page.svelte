@@ -118,7 +118,7 @@ async function handleSaveProduct(e: SubmitEvent) {
 		!formUnitPrice ||
 		Number(formUnitPrice) <= 0
 	) {
-		formError = 'Completa SKU, nombre y precio unitario mayor a cero.';
+		formError = 'Completa PLU, nombre y precio unitario mayor a cero.';
 		return;
 	}
 
@@ -241,7 +241,7 @@ const columnHelper = createAppColumnHelper<ProductResponse>();
 
 const columns = columnHelper.columns([
 	columnHelper.accessor('sku', {
-		header: 'SKU / Código',
+		header: 'PLU / Código',
 		cell: (info) => info.getValue(),
 		meta: { className: 'hidden md:table-cell' },
 	}),
@@ -470,7 +470,7 @@ const table = createAppTable({
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
       <Input
         type="search"
-        placeholder="Buscar por SKU, PLU o nombre..."
+        placeholder="Buscar por PLU o nombre..."
         class="pl-8"
         bind:value={searchTerm}
       />
@@ -522,7 +522,7 @@ const table = createAppTable({
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label for="prod-sku" class="block text-xs font-semibold text-gray-700 mb-1">
-            SKU / Código de Barras *
+            PLU / Código de Barras *
           </label>
           <Input
             id="prod-sku"

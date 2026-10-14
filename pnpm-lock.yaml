@@ -209,18 +209,12 @@ importers:
 
   apps/admin:
     dependencies:
-      '@tanstack/svelte-form':
-        specifier: ^1.33.5
-        version: 1.33.5(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       '@tanstack/svelte-query':
         specifier: ^6.2.1
         version: 6.2.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       '@tanstack/svelte-table':
         specifier: ^9.2.4
         version: 9.2.4(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      '@tanstack/svelte-virtual':
-        specifier: ^3.13.39
-        version: 3.13.39(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       '@vitalcer/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -230,18 +224,9 @@ importers:
       '@vitalcer/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      bits-ui:
-        specifier: ^2.19.2
-        version: 2.19.2(@internationalized/date@3.12.4)(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.1(@typescript-eslint/types@8.70.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)))(svelte@5.57.1(@typescript-eslint/types@8.70.0))(typescript@6.0.3)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)))(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
       lucide-svelte:
         specifier: ^1.0.1
         version: 1.0.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      tailwind-merge:
-        specifier: ^3.7.0
-        version: 3.7.0
       zod:
         specifier: ^3.24.2
         version: 3.25.76
@@ -256,19 +241,19 @@ importers:
         specifier: ^7.1.2
         version: 7.3.0(svelte@5.57.1(@typescript-eslint/types@8.70.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0))
       '@tailwindcss/vite':
-        specifier: ^4.3.0
+        specifier: ^4.3.3
         version: 4.3.3(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0))
       '@types/node':
         specifier: ^24
         version: 24.13.6
       svelte:
-        specifier: ^5.56.1
+        specifier: ^5.57.1
         version: 5.57.1(@typescript-eslint/types@8.70.0)
       svelte-check:
-        specifier: ^4.6.0
+        specifier: ^4.7.6
         version: 4.7.6(picomatch@4.0.7)(svelte@5.57.1(@typescript-eslint/types@8.70.0))(typescript@6.0.3)
       tailwindcss:
-        specifier: ^4.3.0
+        specifier: ^4.3.3
         version: 4.3.3
       typescript:
         specifier: ^6.0.3
@@ -279,15 +264,9 @@ importers:
 
   apps/pos:
     dependencies:
-      '@tanstack/svelte-form':
-        specifier: ^1.33.5
-        version: 1.33.5(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       '@tanstack/svelte-query':
         specifier: ^6.2.1
         version: 6.2.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      '@tanstack/svelte-virtual':
-        specifier: ^3.13.39
-        version: 3.13.39(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       '@vitalcer/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -303,21 +282,12 @@ importers:
       '@zxing/library':
         specifier: ^0.23.0
         version: 0.23.0
-      bits-ui:
-        specifier: ^2.19.2
-        version: 2.19.2(@internationalized/date@3.12.4)(@sveltejs/kit@2.70.3(@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.1(@typescript-eslint/types@8.70.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)))(svelte@5.57.1(@typescript-eslint/types@8.70.0))(typescript@6.0.3)(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)))(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
       lucide-svelte:
         specifier: ^1.0.1
         version: 1.0.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      tailwind-merge:
-        specifier: ^3.7.0
-        version: 3.7.0
       zod:
-        specifier: ^4.6.5
-        version: 4.6.5
+        specifier: ^3.24.2
+        version: 3.25.76
     devDependencies:
       '@sveltejs/adapter-static':
         specifier: ^3.0.10
@@ -329,7 +299,7 @@ importers:
         specifier: ^7.1.2
         version: 7.3.0(svelte@5.57.1(@typescript-eslint/types@8.70.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0))
       '@tailwindcss/vite':
-        specifier: ^4.3.0
+        specifier: ^4.3.3
         version: 4.3.3(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0))
       '@types/node':
         specifier: ^24
@@ -338,13 +308,13 @@ importers:
         specifier: ^2.3.0
         version: 2.3.0(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0))
       svelte:
-        specifier: ^5.56.1
+        specifier: ^5.57.1
         version: 5.57.1(@typescript-eslint/types@8.70.0)
       svelte-check:
-        specifier: ^4.6.0
+        specifier: ^4.7.6
         version: 4.7.6(picomatch@4.0.7)(svelte@5.57.1(@typescript-eslint/types@8.70.0))(typescript@6.0.3)
       tailwindcss:
-        specifier: ^4.3.0
+        specifier: ^4.3.3
         version: 4.3.3
       typescript:
         specifier: ^6.0.3
@@ -1026,28 +996,11 @@ packages:
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
 
-  '@tanstack/devtools-event-client@0.4.4':
-    resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  '@tanstack/form-core@1.33.5':
-    resolution: {integrity: sha512-3dfx9MBP0aq5sXKteikG629X9oviptrQj0IFRk9YGcb+lB7Kv5x8S17oOSk1wUWgjQZ4xVJEMbKwOAODymocgA==}
-
-  '@tanstack/pacer-lite@0.1.1':
-    resolution: {integrity: sha512-y/xtNPNt/YeyoVxE/JCx+T7yjEzpezmbb+toK8DDD1P4m7Kzs5YR956+7OKexG3f8aXgC3rLZl7b1V+yNUSy5w==}
-    engines: {node: '>=18'}
-
   '@tanstack/query-core@5.103.1':
     resolution: {integrity: sha512-rms8HqTGp6zA00dM+cUQ2eBcgzNJefuu5CAMB37i/6MiGT1zulPOytCFu2a0qjLqVR2n1jENPj9woqFQNuCzWA==}
 
   '@tanstack/store@0.11.1':
     resolution: {integrity: sha512-mzTOBhypOuDJAy/D8n2MfUZ1HFkXnmSETviRyhqEC8LUE7/IZQExOTxMANj3KjTofYTkFNpBY67qaVrT41YccA==}
-
-  '@tanstack/svelte-form@1.33.5':
-    resolution: {integrity: sha512-GGlLocQwc4f15EoslfSKSiFwGy1Wz8CPTl6LXcykg4XUEGOmgs8Dg4/RjNyHeN/qrbIMemWuwzbt2wXBq50eXg==}
-    peerDependencies:
-      svelte: ^5.0.0
 
   '@tanstack/svelte-query@6.2.1':
     resolution: {integrity: sha512-qnOuwv5u/xAiOq1WKnPub4oBjFfro2EebM/DWqC7vVvlVk/AEvxy5DApdSHzmvORLtO3fhCP0Jhg8nOdpdsDgA==}
@@ -1914,9 +1867,6 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
-  zod@4.6.5:
-    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
-
 snapshots:
 
   '@esbuild/aix-ppc64@0.28.2':
@@ -2331,25 +2281,9 @@ snapshots:
       tailwindcss: 4.3.3
       vite: 8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)
 
-  '@tanstack/devtools-event-client@0.4.4': {}
-
-  '@tanstack/form-core@1.33.5':
-    dependencies:
-      '@tanstack/devtools-event-client': 0.4.4
-      '@tanstack/pacer-lite': 0.1.1
-      '@tanstack/store': 0.11.1
-
-  '@tanstack/pacer-lite@0.1.1': {}
-
   '@tanstack/query-core@5.103.1': {}
 
   '@tanstack/store@0.11.1': {}
-
-  '@tanstack/svelte-form@1.33.5(svelte@5.57.1(@typescript-eslint/types@8.70.0))':
-    dependencies:
-      '@tanstack/form-core': 1.33.5
-      '@tanstack/svelte-store': 0.12.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))
-      svelte: 5.57.1(@typescript-eslint/types@8.70.0)
 
   '@tanstack/svelte-query@6.2.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))':
     dependencies:
@@ -3128,5 +3062,3 @@ snapshots:
   zimmerframe@1.1.5: {}
 
   zod@3.25.76: {}
-
-  zod@4.6.5: {}

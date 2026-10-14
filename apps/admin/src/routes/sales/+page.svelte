@@ -181,16 +181,28 @@ const filteredTickets = $derived(
 	}),
 );
 
-// High-level KPI metrics
-const totalRevenue = $derived(
-	tickets.reduce((acc, t) => acc + t.totalAmount, 0),
+function isToday(d: Date): boolean {
+	const now = new Date();
+	return (
+		d.getDate() === now.getDate() &&
+		d.getMonth() === now.getMonth() &&
+		d.getFullYear() === now.getFullYear()
+	);
+}
+
+const todayTickets = $derived(tickets.filter((t) => isToday(t.date)));
+
+// High-level KPI metrics (scoped to today)
+const totalRevenueToday = $derived(
+	todayTickets.reduce((acc, t) => acc + t.totalAmount, 0),
 );
+const todayTicketsCount = $derived(todayTickets.length);
 const totalTicketsCount = $derived(tickets.length);
-const averageTicket = $derived(
-	totalTicketsCount > 0 ? Math.round(totalRevenue / totalTicketsCount) : 0,
+const averageTicketToday = $derived(
+	todayTicketsCount > 0 ? Math.round(totalRevenueToday / todayTicketsCount) : 0,
 );
-const totalItemsSold = $derived(
-	tickets.reduce((acc, t) => acc + t.totalUnitsOrLines, 0),
+const totalItemsSoldToday = $derived(
+	todayTickets.reduce((acc, t) => acc + t.totalUnitsOrLines, 0),
 );
 
 function formatTicketDate(isoDate: string): string {
@@ -251,64 +263,64 @@ async function handleRefresh() {
 		<!-- Total Facturado -->
 		<Card class="p-4 sm:p-5 flex flex-col justify-between">
 			<div class="flex items-center justify-between text-gray-500 mb-2">
-				<span class="text-xs font-semibold uppercase tracking-wider">Total Facturado</span>
+				<span class="text-xs font-semibold uppercase tracking-wider">Total Facturado (Hoy)</span>
 				<div class="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
 					<DollarSign class="w-4 h-4" />
 				</div>
 			</div>
 			<div>
 				<div class="text-xl sm:text-2xl font-black text-emerald-700">
-					{formatARS(totalRevenue)}
+					{formatARS(totalRevenueToday)}
 				</div>
-				<div class="text-xs text-gray-400 mt-0.5">Monto total cobrado</div>
+				<div class="text-xs text-gray-400 mt-0.5">Monto cobrado hoy</div>
 			</div>
 		</Card>
 
 		<!-- Cantidad de Tickets -->
 		<Card class="p-4 sm:p-5 flex flex-col justify-between">
 			<div class="flex items-center justify-between text-gray-500 mb-2">
-				<span class="text-xs font-semibold uppercase tracking-wider">Tickets Emitidos</span>
+				<span class="text-xs font-semibold uppercase tracking-wider">Tickets Emitidos (Hoy)</span>
 				<div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
 					<ShoppingBag class="w-4 h-4" />
 				</div>
 			</div>
 			<div>
 				<div class="text-xl sm:text-2xl font-black text-gray-900">
-					{totalTicketsCount}
+					{todayTicketsCount}
 				</div>
-				<div class="text-xs text-gray-400 mt-0.5">Operaciones completadas</div>
+				<div class="text-xs text-gray-400 mt-0.5">Operaciones hoy ({totalTicketsCount} total)</div>
 			</div>
 		</Card>
 
 		<!-- Ticket Promedio -->
 		<Card class="p-4 sm:p-5 flex flex-col justify-between">
 			<div class="flex items-center justify-between text-gray-500 mb-2">
-				<span class="text-xs font-semibold uppercase tracking-wider">Ticket Promedio</span>
+				<span class="text-xs font-semibold uppercase tracking-wider">Ticket Promedio (Hoy)</span>
 				<div class="p-2 bg-violet-50 text-violet-600 rounded-lg">
 					<TrendingUp class="w-4 h-4" />
 				</div>
 			</div>
 			<div>
 				<div class="text-xl sm:text-2xl font-black text-gray-900">
-					{formatARS(averageTicket)}
+					{formatARS(averageTicketToday)}
 				</div>
-				<div class="text-xs text-gray-400 mt-0.5">Promedio por venta</div>
+				<div class="text-xs text-gray-400 mt-0.5">Promedio de hoy</div>
 			</div>
 		</Card>
 
 		<!-- Artículos Vendidos -->
 		<Card class="p-4 sm:p-5 flex flex-col justify-between">
 			<div class="flex items-center justify-between text-gray-500 mb-2">
-				<span class="text-xs font-semibold uppercase tracking-wider">Artículos Despachados</span>
+				<span class="text-xs font-semibold uppercase tracking-wider">Artículos Despachados (Hoy)</span>
 				<div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
 					<Package class="w-4 h-4" />
 				</div>
 			</div>
 			<div>
 				<div class="text-xl sm:text-2xl font-black text-gray-900">
-					{totalItemsSold}
+					{totalItemsSoldToday}
 				</div>
-				<div class="text-xs text-gray-400 mt-0.5">Líneas de venta en caja</div>
+				<div class="text-xs text-gray-400 mt-0.5">Líneas de venta hoy</div>
 			</div>
 		</Card>
 	</div>
@@ -320,7 +332,7 @@ async function handleRefresh() {
 				<Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
 				<Input
 					bind:value={searchTerm}
-					placeholder="Buscar por N° Ticket (POS-...), producto o SKU..."
+					placeholder="Buscar por N° Ticket (POS-...), producto o PLU..."
 					class="pl-9 h-10 text-sm"
 				/>
 			</div>

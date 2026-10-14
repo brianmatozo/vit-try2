@@ -11,6 +11,7 @@ import {
 	formatWeight,
 	parseBarcode,
 } from '@vitalcer/core';
+import { Button, Dialog } from '@vitalcer/ui';
 import {
 	AlertCircle,
 	Camera,
@@ -294,19 +295,14 @@ function handleCheckoutSuccess() {
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="max-w-md mx-auto w-full min-h-dvh flex flex-col bg-neutral-950 text-neutral-100 selection:bg-emerald-500 selection:text-white">
-	<!-- Top App Header -->
-	<header class="px-4 py-3 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 flex items-center justify-between shrink-0 sticky top-0 z-30">
-		<div class="flex items-center gap-2">
-			<div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-black text-sm">
-				V
-			</div>
-			<div>
-				<h1 class="text-sm font-extrabold tracking-tight text-white flex items-center gap-1.5 leading-none">
-					<span>Vitalcer POS</span>
-					<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-				</h1>
-				<span class="text-[10px] font-medium text-neutral-400">Caja Mostrador</span>
-			</div>
+	<!-- Top Action Bar (Compact) -->
+	<header class="px-3 py-2 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 flex items-center justify-between shrink-0 sticky top-0 z-30">
+		<div class="flex items-center gap-2 text-xs font-semibold text-neutral-400">
+			{#if !cart.isEmpty}
+				<span class="text-emerald-400 font-bold">{cart.items.length} {cart.items.length === 1 ? 'ítem' : 'ítems'}</span>
+			{:else}
+				<span class="text-neutral-500">Mostrador</span>
+			{/if}
 		</div>
 
 		<div class="flex items-center gap-2">
@@ -459,23 +455,27 @@ function handleCheckoutSuccess() {
 						</div>
 
 						<!-- Line Total & Delete -->
-						<div class="text-right shrink-0 flex flex-col items-end">
+						<div class="text-right shrink-0 flex items-center gap-2">
 							<span class="text-base font-black text-emerald-400">
 								{formatARS(item.lineTotal)}
 							</span>
 							<button
 								type="button"
 								onclick={() => cart.removeItem(item.id)}
-								class="p-1 text-neutral-500 hover:text-rose-400 transition -mr-1"
+								class="w-8 h-8 rounded-xl bg-neutral-800 hover:bg-rose-950/60 hover:text-rose-400 border border-neutral-700/80 hover:border-rose-800/60 text-neutral-400 flex items-center justify-center transition active:scale-95"
 								aria-label="Eliminar ítem"
 							>
-								<Trash2 class="w-3.5 h-3.5" />
+								<Trash2 class="w-4 h-4" />
 							</button>
 						</div>
 					</div>
 
-					<!-- Quantity or Weight Stepper Controls -->
+					<!-- Quantity or Weight Stepper Controls (Ergonomic: Subtotal on Left, Stepper on Right) -->
 					<div class="pt-2 border-t border-neutral-800/80 flex items-center justify-between">
+						<span class="text-xs font-semibold text-neutral-400">
+							Subtotal: <span class="text-white font-bold">{formatARS(item.lineTotal)}</span>
+						</span>
+
 						{#if item.isBulk}
 							<!-- Bulk Weight Modifier Button -->
 							<button
@@ -488,7 +488,7 @@ function handleCheckoutSuccess() {
 								<span class="text-[10px] text-neutral-400 font-normal">(Modificar)</span>
 							</button>
 						{:else}
-							<!-- Discrete Unit Stepper -->
+							<!-- Discrete Unit Stepper on the RIGHT side -->
 							<div class="flex items-center gap-1 bg-neutral-800 rounded-xl p-0.5 border border-neutral-700">
 								<button
 									type="button"
@@ -513,10 +513,6 @@ function handleCheckoutSuccess() {
 								</button>
 							</div>
 						{/if}
-
-						<span class="text-[11px] font-medium text-neutral-500">
-							Subtotal: {formatARS(item.lineTotal)}
-						</span>
 					</div>
 				</div>
 			{/each}
@@ -585,33 +581,35 @@ function handleCheckoutSuccess() {
 	/>
 
 	<!-- Clear Cart Confirmation Dialog -->
-	{#if isClearConfirmOpen}
-		<div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-			<div class="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 max-w-xs w-full text-center space-y-4 shadow-2xl">
-				<div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto">
-					<Trash2 class="w-6 h-6" />
-				</div>
-				<div>
-					<h3 class="text-base font-bold text-white">¿Vaciar el carrito?</h3>
-					<p class="text-xs text-neutral-400 mt-1">Se eliminarán todos los artículos actuales.</p>
-				</div>
-				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						onclick={() => (isClearConfirmOpen = false)}
-						class="flex-1 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-300 transition"
-					>
-						Cancelar
-					</button>
-					<button
-						type="button"
-						onclick={handleClearCart}
-						class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition shadow-md"
-					>
-						Vaciar
-					</button>
-				</div>
+	<Dialog
+		bind:open={isClearConfirmOpen}
+		title="¿Vaciar el carrito?"
+		description="Se eliminarán todos los artículos actuales del carrito."
+		position="center"
+		class="max-w-xs"
+	>
+		<div class="py-2 text-center space-y-3">
+			<div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto">
+				<Trash2 class="w-6 h-6" />
 			</div>
 		</div>
-	{/if}
+		{#snippet footer()}
+			<Button
+				variant="outline"
+				size="sm"
+				onclick={() => (isClearConfirmOpen = false)}
+				class="flex-1"
+			>
+				Cancelar
+			</Button>
+			<Button
+				variant="destructive"
+				size="sm"
+				onclick={handleClearCart}
+				class="flex-1"
+			>
+				Vaciar
+			</Button>
+		{/snippet}
+	</Dialog>
 </div>

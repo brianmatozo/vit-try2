@@ -79,16 +79,17 @@ function handleClose() {
 <Dialog
 	bind:open
 	title="Buscar Producto"
-	description="Catálogo por nombre, código de barras SKU o código PLU"
-	class="max-w-md"
+	description="Catálogo por nombre, código de barras PLU o código PLU"
+	position="top"
+	class="max-w-md max-h-[88dvh] flex flex-col"
 >
-	<div class="space-y-3 pt-1">
+	<div class="space-y-3 pt-1 flex flex-col flex-1 min-h-0">
 		<!-- Search Input -->
-		<div class="relative">
+		<div class="relative shrink-0">
 			<Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
 			<Input
 				bind:value={searchTerm}
-				placeholder="Escribí nombre, SKU o PLU..."
+				placeholder="Escribí nombre, PLU..."
 				class="pl-9 pr-9 h-11 text-base font-medium rounded-xl"
 				autofocus
 			/>
@@ -105,7 +106,7 @@ function handleClose() {
 		</div>
 
 		<!-- Filter Pills -->
-		<div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+		<div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs shrink-0">
 			<button
 				type="button"
 				onclick={() => (filterType = 'all')}
@@ -130,7 +131,7 @@ function handleClose() {
 		</div>
 
 		<!-- Results List -->
-		<div class="space-y-1.5 max-h-[50dvh] overflow-y-auto pr-0.5">
+		<div class="space-y-1.5 flex-1 min-h-[160px] overflow-y-auto pr-0.5">
 			{#if productsQuery.isLoading}
 				<div class="py-12 text-center text-sm text-neutral-500 font-medium">
 					Cargando catálogo de productos...

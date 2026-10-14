@@ -697,7 +697,7 @@ bin/
 demo/
 demos/
 doc/
-docs/
+# docs/ (retained docs/_build/ on line 92)
 example/
 examples/
 GNUmakefile.bak
@@ -740,3 +740,12 @@ vite.config.ts.timestamp-*
 
 # Unignore SvelteKit src/lib
 !**/src/lib/**
+
+images
+images/
+images/*
+
+.agents/*
+.agents
+.agents/
+

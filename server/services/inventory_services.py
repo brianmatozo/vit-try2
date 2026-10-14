@@ -226,7 +226,7 @@ async def record_pos_batch_sale(
             raise ValueError(f"Product with ID {pid} not found")
         if product.current_stock < qty:
             raise ValueError(
-                f"Physical stock depleted for '{product.name}' (SKU: {product.sku}): "
+                f"Physical stock depleted for '{product.name}' (PLU: {product.sku}): "
                 f"requested {qty}, available {product.current_stock}"
             )
 

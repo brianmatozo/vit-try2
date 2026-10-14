@@ -144,6 +144,13 @@ The canonical definition lives in [`server/models/inventory_ledger.py`](server/m
 | `notes` | `str?` | Optional human-readable rationale (e.g. "Spill on shelf 2", "Arqueo adjustment"). |
 | `created_at` | `datetime` | Immutable UTC transaction timestamp. |
 
+### 3.4 Automated Stock Inbound & Remito Ingestion (AI Vision)
+
+To eliminate manual typing when receiving large distributor deliveries (30–60 items per delivery note from *New Day*, *Patagonia*, etc.), inbound receiving is automated via multi-page AI Vision photo extraction (Gemini 2.0 Flash via OpenRouter), packaging-to-unit conversion, and Argentine fiscal split calculations (60/40 blanco/negro + 21% IVA).
+
+For the complete standalone technical specification, data models (`remitos`, `remito_items`, `supplier_product_mappings`), API contracts, and staging UI design, see:
+👉 [**Remito Ingestion & Automated Stock Inbound Service Specification**](docs/remito_ingestion_specification.md).
+
 ---
 
 ## 4. Hardware & In-Store Barcode Parsing (EAN-13)

@@ -11,6 +11,8 @@ interface Props {
 	children?: Snippet;
 	footer?: Snippet;
 	class?: string;
+	position?: 'bottom' | 'top' | 'center' | 'fullscreen';
+	centered?: boolean;
 }
 
 let {
@@ -20,7 +22,11 @@ let {
 	children,
 	footer,
 	class: className = '',
+	position = 'bottom',
+	centered = false,
 }: Props = $props();
+
+const activePosition = $derived(centered ? 'center' : position);
 </script>
 
 <BitsDialog.Root bind:open>
@@ -30,12 +36,20 @@ let {
     />
     <BitsDialog.Content
       class={cn(
-        'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-2xl border-t border-x border-gray-200 bg-white p-4 pb-6 shadow-2xl text-gray-900 focus:outline-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:max-h-[88dvh] sm:rounded-xl sm:border sm:p-6',
+        activePosition === 'fullscreen'
+          ? 'fixed inset-0 z-50 flex h-full w-full flex-col bg-white p-4 shadow-2xl text-gray-900 focus:outline-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:max-h-[88dvh] sm:rounded-xl sm:border sm:p-6'
+          : activePosition === 'top'
+            ? 'fixed inset-x-0 top-0 z-50 flex max-h-[88dvh] w-full flex-col rounded-b-2xl border-b border-x border-gray-200 bg-white p-4 pb-6 shadow-2xl text-gray-900 focus:outline-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:max-h-[88dvh] sm:rounded-xl sm:border sm:p-6'
+            : activePosition === 'center'
+              ? 'fixed inset-auto left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 flex max-h-[88dvh] w-[calc(100%-2rem)] max-w-lg flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-2xl text-gray-900 focus:outline-none'
+              : 'fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] w-full flex-col rounded-t-2xl border-t border-x border-gray-200 bg-white p-4 pb-6 shadow-2xl text-gray-900 focus:outline-none sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[calc(100%-2rem)] sm:max-w-lg sm:max-h-[88dvh] sm:rounded-xl sm:border sm:p-6',
         className
       )}
     >
-      <!-- Mobile bottom-sheet drag handle indicator -->
-      <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-2.5 sm:hidden shrink-0"></div>
+      <!-- Mobile drag handle indicator -->
+      {#if activePosition === 'bottom'}
+        <div class="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-2.5 sm:hidden shrink-0"></div>
+      {/if}
 
       <div class="flex items-start justify-between mb-3 shrink-0">
         <div>

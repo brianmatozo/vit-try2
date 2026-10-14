@@ -18,5 +18,26 @@
 	},
 	"watcher": {
 		"ignore": ["node_modules/**", "dist/**", ".git/**"]
+	},
+	"mcp": {
+		"svelte": {
+			"type": "local",
+			"command": ["npx", "--force", "-y", "@sveltejs/mcp"]
+		},
+		"analyzer": {
+			"type": "local",
+			"command": ["uvx", "mcp-server-analyzer"],
+			"enabled": false
+		},
+		"context7": {
+			"type": "local",
+			"command": ["npx", "-y", "@upstash/context7-mcp"],
+			"enabled": false
+		},
+		"postgres": {
+			"type": "local",
+			"command": ["npx", "-y", "@microsoft/postgres-mcp", "run"],
+			"enabled": false
+		}
 	}
 }

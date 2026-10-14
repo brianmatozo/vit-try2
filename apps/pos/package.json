@@ -17,28 +17,23 @@
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
-		"@tailwindcss/vite": "^4.3.0",
+		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^24",
 		"@vitejs/plugin-basic-ssl": "^2.3.0",
-		"svelte": "^5.56.1",
-		"svelte-check": "^4.6.0",
-		"tailwindcss": "^4.3.0",
+		"svelte": "^5.57.1",
+		"svelte-check": "^4.7.6",
+		"tailwindcss": "^4.3.3",
 		"typescript": "^6.0.3",
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
-		"@tanstack/svelte-form": "^1.33.5",
 		"@tanstack/svelte-query": "^6.2.1",
-		"@tanstack/svelte-virtual": "^3.13.39",
 		"@vitalcer/api": "workspace:*",
 		"@vitalcer/core": "workspace:*",
 		"@vitalcer/ui": "workspace:*",
 		"@zxing/browser": "^0.2.1",
 		"@zxing/library": "^0.23.0",
-		"bits-ui": "^2.19.2",
-		"clsx": "^2.1.1",
 		"lucide-svelte": "^1.0.1",
-		"tailwind-merge": "^3.7.0",
-		"zod": "^4.6.5"
+		"zod": "^3.24.2"
 	}
 }
