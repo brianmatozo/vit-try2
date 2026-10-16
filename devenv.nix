@@ -1,6 +1,7 @@
 { pkgs, lib, config, inputs, ... }:
 
 {
+  dotenv.enable = true;
   # Environment variables
   env = {
     # Let uv manage standalone Python 3.14 toolchains hermetically
@@ -35,7 +36,6 @@
     tailwindcss-language-server # Optional Tailwind CSS class completion
 
     # System & Database utilities
-    postgresql_18    # psql CLI, pg_dump, and postgres tools matching docker-compose
     caddy            # Fast HTTP/2 & HTTP/3 web server with automatic TLS & Brotli
     pkg-config
     harlequin        # Terminal SQL IDE / DB viewer
@@ -174,8 +174,8 @@
     listen_addresses = "127.0.0.1";
     port = 5432;
     initialDatabases = [
-      { name = "vitalcer"; user = "vitalcer"; }
-      { name = "brian"; user = "vitalcer"; }
+      { name = "vitalcer"; user = "vitalcer"; pass = "vitalcer"; }
+      { name = "brian"; user = "vitalcer"; pass = "vitalcer"; }
     ];
     initialScript = ''
       DO $$
@@ -216,19 +216,6 @@
     echo "    • biome (Rust):  $(biome --version 2>/dev/null || echo 'available')"
     echo "    • svelte-lsp:    $(svelteserver --version 2>/dev/null || echo 'available')"
     echo "    • vtsls (TS LSP):$(vtsls --version 2>/dev/null || echo 'available')"
-    echo "  Web Server & Proxy:"
-    echo "    • caddy:         $(caddy version 2>/dev/null | head -n1 || echo 'available')"
-    echo ""
-    echo "  Commands available:"
-    echo "    • Dev:       dev, dev-admin (dev:admin), dev-pos (dev:pos), db"
-    echo "    • Serve:     serve, serve:reload, caddy:validate"
-    echo "    • Check:     check, check:be, check:fe, check-admin, check-pos"
-    echo "    • Lint/Fix:  lint, format, fix (or :be / :fe)"
-    echo "    • Typecheck: typecheck (ty), typecheck:strict (basedpyright)"
-    echo "    • Test:      test (pytest), test:fe, test:all"
-    echo "    • Build:     build, build-admin, build-pos"
-    echo "    • API:       openapi, codegen (api:generate)"
-    echo ""
   '';
 }
 
