@@ -18,6 +18,8 @@ dev = ["mypy>=2.1.0", "pytest>=9.0.3", "ruff>=0.15.14"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["tests"]
+norecursedirs = [".venv", "tools", "data", "apps", "packages", "node_modules"]
 addopts = "-p no:platformdirs"
 
 [tool.ruff]

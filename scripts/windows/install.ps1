@@ -46,14 +46,34 @@ if (-not (Test-Path $CaddyExe) -and -not (Get-Command caddy -ErrorAction Silentl
     Write-Host "    • Caddy disponible ✅" -ForegroundColor Green
 }
 
-# 3. Initialize PostgreSQL data cluster if needed
-Write-Host "==> [Paso 3/5] Verificando cluster de base de datos PostgreSQL..." -ForegroundColor Cyan
+# 3. Check or download PostgreSQL for Windows & initialize cluster
+Write-Host "==> [Paso 3/5] Verificando PostgreSQL 18 portable..." -ForegroundColor Cyan
+$PgToolsDir = Join-Path $RepoRoot "tools\pgsql"
+$LocalInitDb = Join-Path $PgToolsDir "bin\initdb.exe"
+$LocalPgCtl = Join-Path $PgToolsDir "bin\pg_ctl.exe"
+$LocalCreateDb = Join-Path $PgToolsDir "bin\createdb.exe"
+
+if (-not (Test-Path $LocalInitDb)) {
+    Write-Host "    • Descargando PostgreSQL 18 portable para Windows (AMD64)..." -ForegroundColor Yellow
+    $PgZip = Join-Path $RepoRoot "tools\pgsql.zip"
+    $PgUrl = "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip"
+    try {
+        Invoke-WebRequest -Uri $PgUrl -OutFile $PgZip -UseBasicParsing
+        Expand-Archive -Path $PgZip -DestinationPath (Join-Path $RepoRoot "tools") -Force
+        Remove-Item $PgZip -Force -ErrorAction SilentlyContinue
+        Write-Host "    • PostgreSQL 18 descargado y extraído en $PgToolsDir ✅" -ForegroundColor Green
+    } catch {
+        Write-Warning "No se pudo auto-descargar PostgreSQL portable: $_"
+    }
+} else {
+    Write-Host "    • PostgreSQL portable disponible ✅" -ForegroundColor Green
+}
+
 $PgDataDir = Join-Path $RepoRoot "data\postgres"
 $PgVersionFile = Join-Path $PgDataDir "PG_VERSION"
 
 if (-not (Test-Path $PgVersionFile)) {
     $InitDbCmd = $null
-    $LocalInitDb = Join-Path $RepoRoot "tools\pgsql\bin\initdb.exe"
     if (Test-Path $LocalInitDb) {
         $InitDbCmd = $LocalInitDb
     } elseif (Get-Command initdb -ErrorAction SilentlyContinue) {
@@ -61,12 +81,23 @@ if (-not (Test-Path $PgVersionFile)) {
     }
 
     if ($InitDbCmd) {
-        Write-Host "    • Inicializando nuevo cluster de base de datos en $PgDataDir..." -ForegroundColor Yellow
+        Write-Host "    • Inicializando cluster de base de datos en $PgDataDir..." -ForegroundColor Yellow
         New-Item -ItemType Directory -Force -Path $PgDataDir | Out-Null
         & $InitDbCmd -D $PgDataDir -U vitalcer --auth=trust --encoding=UTF8
         Write-Host "    • Cluster PostgreSQL inicializado con usuario 'vitalcer' ✅" -ForegroundColor Green
+
+        # Ensure database 'vitalcer' is created
+        if ((Test-Path $LocalPgCtl) -and (Test-Path $LocalCreateDb)) {
+            Write-Host "    • Creando base de datos inicial 'vitalcer'..." -ForegroundColor Yellow
+            $TempLog = Join-Path $RepoRoot "data\logs\postgres.log"
+            & $LocalPgCtl -D $PgDataDir -l $TempLog -w start
+            Start-Sleep -Seconds 1
+            & $LocalCreateDb -U vitalcer -h 127.0.0.1 vitalcer 2>$null
+            & $LocalPgCtl -D $PgDataDir -m fast stop
+            Write-Host "    • Base de datos 'vitalcer' lista ✅" -ForegroundColor Green
+        }
     } else {
-        Write-Host "    • Nota: Si usas el servicio de Windows existente o Docker, PostgreSQL usara el puerto 5432." -ForegroundColor Gray
+        Write-Host "    • Nota: Si usas el servicio de Windows existente o Docker, PostgreSQL usará el puerto 5432." -ForegroundColor Gray
     }
 } else {
     Write-Host "    • Datos de PostgreSQL ya existentes en $PgDataDir ✅" -ForegroundColor Green

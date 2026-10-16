@@ -21,6 +21,12 @@ from pathlib import Path
 from typing import Callable, Optional
 
 IS_WINDOWS = platform.system() == "Windows"
+if sys.platform == "win32":
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = REPO_ROOT / "data" / "postgres"
 LOGS_DIR = REPO_ROOT / "data" / "logs"
@@ -126,6 +132,14 @@ class ServiceProcess:
                     return True
                 if self.process and self.process.poll() is not None:
                     code = self.process.returncode
+                    if code == 0:
+                        for _ in range(25):
+                            time.sleep(0.2)
+                            if self.is_port_open():
+                                self._append_log(
+                                    f"[{self.display_name}] Activo en puerto {self.port} ✅"
+                                )
+                                return True
                     self._append_log(
                         f"[{self.display_name}] Proceso terminó código {code} ❌"
                     )
@@ -239,6 +253,7 @@ class ServiceManager:
                 str(DATA_DIR),
                 "-l",
                 str(LOGS_DIR / "postgres.log"),
+                "-w",
                 "start",
             ]
         else:
@@ -260,12 +275,19 @@ class ServiceManager:
             "--port",
             "8000",
         ]
+        backend_env = {
+            "PYTHONUNBUFFERED": "1",
+            "DATABASE_URL": os.environ.get(
+                "DATABASE_URL",
+                "postgresql://vitalcer@127.0.0.1:5432/vitalcer",
+            ),
+        }
         self.services["backend"] = ServiceProcess(
             name="backend",
             display_name="FastAPI Backend",
             port=8000,
             start_cmd=fastapi_cmd,
-            env={"PYTHONUNBUFFERED": "1"},
+            env=backend_env,
         )
 
         # 3. Caddy Reverse Proxy & Static SPA Server (Ports 5173, 5174)
@@ -284,7 +306,30 @@ class ServiceManager:
         srv = self.services.get(name)
         if not srv:
             return False
-        return srv.start()
+        started = srv.start()
+        if started and name == "postgres" and self.postgres_cmd:
+            createdb_bin = (
+                Path(self.postgres_cmd).parent
+                / ("createdb.exe" if IS_WINDOWS else "createdb")
+            )
+            if createdb_bin.is_file():
+                try:
+                    subprocess.run(
+                        [
+                            str(createdb_bin),
+                            "-U",
+                            "vitalcer",
+                            "-h",
+                            "127.0.0.1",
+                            "vitalcer",
+                        ],
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                except Exception:
+                    pass
+        return started
 
     def stop_service(self, name: str) -> bool:
         srv = self.services.get(name)

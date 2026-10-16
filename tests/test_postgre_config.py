@@ -28,8 +28,11 @@ class TestPostgreConfig:
     def test_postgre_prod_conf_compatibility(self):
         prod_conf = Path("postgre.prod.conf")
         assert prod_conf.exists(), "postgre.prod.conf symlink or file must exist"
-        # Must resolve to postgre.conf
-        assert prod_conf.resolve() == Path("postgre.conf").resolve()
+        if prod_conf.is_symlink():
+            assert prod_conf.resolve() == Path("postgre.conf").resolve()
+        else:
+            text = prod_conf.read_text().strip()
+            assert text in ("postgre.conf", Path("postgre.conf").read_text().strip())
 
     def test_docker_compose_config_validity(self):
         dc_path = Path("docker-compose.yaml")
