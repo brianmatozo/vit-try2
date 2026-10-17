@@ -24,13 +24,8 @@ let {
 	oncancel,
 }: Props = $props();
 
-let weightInput = $state<number>(100);
-
-$effect(() => {
-	if (open) {
-		weightInput = initialWeight > 0 ? initialWeight : 100;
-	}
-});
+/* svelte-ignore state_referenced_locally */
+let weightInput = $state<number>(initialWeight > 0 ? initialWeight : 100);
 
 let bulkRef = $derived(
 	product?.bulk_reference_grams && product.bulk_reference_grams > 0

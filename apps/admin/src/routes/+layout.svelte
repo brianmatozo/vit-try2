@@ -48,7 +48,7 @@ const navLinks = [
           </a>
 
           <nav class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-            {#each navLinks as link}
+            {#each navLinks as link (link.href)}
               {@const isActive = page.url.pathname === link.href}
               <a
                 href={link.href}

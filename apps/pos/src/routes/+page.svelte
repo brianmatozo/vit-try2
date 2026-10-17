@@ -562,23 +562,27 @@ function handleCheckoutSuccess() {
 		onclose={() => (isSearchOpen = false)}
 	/>
 
-	<ManualWeightModal
-		bind:open={isWeightModalOpen}
-		product={activeWeightProduct}
-		initialWeight={initialWeightGrams}
-		onconfirm={handleWeightConfirm}
-		oncancel={() => {
-			isWeightModalOpen = false;
-			activeWeightProduct = null;
-			activeWeightItemId = null;
-		}}
-	/>
+	{#if isWeightModalOpen}
+		<ManualWeightModal
+			bind:open={isWeightModalOpen}
+			product={activeWeightProduct}
+			initialWeight={initialWeightGrams}
+			onconfirm={handleWeightConfirm}
+			oncancel={() => {
+				isWeightModalOpen = false;
+				activeWeightProduct = null;
+				activeWeightItemId = null;
+			}}
+		/>
+	{/if}
 
-	<CheckoutModal
-		bind:open={isCheckoutOpen}
-		oncomplete={handleCheckoutSuccess}
-		oncancel={() => (isCheckoutOpen = false)}
-	/>
+	{#if isCheckoutOpen}
+		<CheckoutModal
+			bind:open={isCheckoutOpen}
+			oncomplete={handleCheckoutSuccess}
+			oncancel={() => (isCheckoutOpen = false)}
+		/>
+	{/if}
 
 	<!-- Clear Cart Confirmation Dialog -->
 	<Dialog

@@ -16,7 +16,10 @@ from tkinter import messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
 # Add repository root to path
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if getattr(sys, "frozen", False):
+    REPO_ROOT = Path(sys.executable).resolve().parent
+else:
+    REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.windows.service_manager import ServiceManager  # noqa: E402
@@ -209,9 +212,9 @@ class VitalcerControlApp:
         for idx, (srv_key, name, port_str, extra_btns) in enumerate(
             services_info, start=1
         ):
-            tk.Label(
-                srv_frame, text=name, font=("Segoe UI", 9), anchor="w"
-            ).grid(row=idx, column=0, padx=4, pady=4, sticky="w")
+            tk.Label(srv_frame, text=name, font=("Segoe UI", 9), anchor="w").grid(
+                row=idx, column=0, padx=4, pady=4, sticky="w"
+            )
             tk.Label(
                 srv_frame,
                 text=port_str,
@@ -454,6 +457,14 @@ class VitalcerControlApp:
 
 
 def main() -> None:
+    if "--backend" in sys.argv or "--server" in sys.argv:
+        import uvicorn
+
+        from server.main import app
+
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+        return
+
     root = tk.Tk()
     _app = VitalcerControlApp(root)
     root.mainloop()

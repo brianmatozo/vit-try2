@@ -8,7 +8,7 @@ import {
 	FlashlightOff,
 	RefreshCw,
 } from 'lucide-svelte';
-import { onDestroy, onMount, untrack } from 'svelte';
+import { untrack } from 'svelte';
 
 interface Props {
 	onscan: (barcode: string) => void;
@@ -312,10 +312,6 @@ $effect(() => {
 			stopCamera();
 		});
 	};
-});
-
-onDestroy(() => {
-	stopCamera();
 });
 </script>
 

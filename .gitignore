@@ -52,6 +52,7 @@ devenv.local.yaml
 *.pyd
 *.so
 *.spec
+!scripts/windows/vitalcer.spec
 .installed.cfg
 dist/
 MANIFEST
@@ -394,6 +395,7 @@ pip-log.txt
 *.pyo
 *.sage.py
 *.spec
+!scripts/windows/vitalcer.spec
 .Python
 .python-version
 archive.zip

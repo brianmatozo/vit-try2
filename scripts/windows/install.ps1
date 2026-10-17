@@ -18,6 +18,10 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     try {
         powershell -ExecutionPolicy ByPass -Command "irm https://astral.sh/uv/install.ps1 | iex"
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $localBin = Join-Path $env:USERPROFILE ".local\bin"
+        $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
+        if (Test-Path $localBin) { $env:Path = "$localBin;$env:Path" }
+        if (Test-Path $cargoBin) { $env:Path = "$cargoBin;$env:Path" }
     } catch {
         Write-Warning "No se pudo auto-instalar uv. Asegurate de tener Python 3.12+ instalado."
     }
@@ -55,14 +59,20 @@ $LocalCreateDb = Join-Path $PgToolsDir "bin\createdb.exe"
 
 if (-not (Test-Path $LocalInitDb)) {
     Write-Host "    • Descargando PostgreSQL 18 portable para Windows (AMD64)..." -ForegroundColor Yellow
-    $PgZip = Join-Path $RepoRoot "tools\pgsql.zip"
+    $ToolsDir = Join-Path $RepoRoot "tools"
+    New-Item -ItemType Directory -Force -Path $ToolsDir | Out-Null
+    $PgZip = Join-Path $ToolsDir "pgsql.zip"
     $PgUrl = "https://get.enterprisedb.com/postgresql/postgresql-18.6-5-windows-x64-binaries.zip"
+    $oldProgress = $ProgressPreference
     try {
+        $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $PgUrl -OutFile $PgZip -UseBasicParsing
-        Expand-Archive -Path $PgZip -DestinationPath (Join-Path $RepoRoot "tools") -Force
+        $ProgressPreference = $oldProgress
+        Expand-Archive -Path $PgZip -DestinationPath $ToolsDir -Force
         Remove-Item $PgZip -Force -ErrorAction SilentlyContinue
         Write-Host "    • PostgreSQL 18 descargado y extraído en $PgToolsDir ✅" -ForegroundColor Green
     } catch {
+        $ProgressPreference = $oldProgress
         Write-Warning "No se pudo auto-descargar PostgreSQL portable: $_"
     }
 } else {
@@ -89,7 +99,9 @@ if (-not (Test-Path $PgVersionFile)) {
         # Ensure database 'vitalcer' is created
         if ((Test-Path $LocalPgCtl) -and (Test-Path $LocalCreateDb)) {
             Write-Host "    • Creando base de datos inicial 'vitalcer'..." -ForegroundColor Yellow
-            $TempLog = Join-Path $RepoRoot "data\logs\postgres.log"
+            $LogsDir = Join-Path $RepoRoot "data\logs"
+            New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null
+            $TempLog = Join-Path $LogsDir "postgres.log"
             & $LocalPgCtl -D $PgDataDir -l $TempLog -w start
             Start-Sleep -Seconds 1
             & $LocalCreateDb -U vitalcer -h 127.0.0.1 vitalcer 2>$null

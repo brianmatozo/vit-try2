@@ -27,6 +27,7 @@ import {
 	ShoppingBag,
 	TrendingUp,
 } from 'lucide-svelte';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 const queryClient = useQueryClient();
 
@@ -60,7 +61,7 @@ const productsList = $derived<ProductResponse[]>(
 );
 
 const productsMap = $derived.by(() => {
-	const map = new Map<number, ProductResponse>();
+	const map = new SvelteMap<number, ProductResponse>();
 	for (const p of productsList) {
 		map.set(p.id, p);
 	}
@@ -90,7 +91,7 @@ interface TicketGroup {
 
 // Group ledger entries by ticket reference ID
 const tickets = $derived.by<TicketGroup[]>(() => {
-	const map = new Map<string, TicketGroup>();
+	const map = new SvelteMap<string, TicketGroup>();
 
 	for (const entry of ledgerEntries) {
 		if (entry.movement_type !== 'sale_pos') continue;
@@ -156,16 +157,14 @@ const tickets = $derived.by<TicketGroup[]>(() => {
 
 // Search filter
 let searchTerm = $state('');
-let expandedTicketIds = $state(new Set<string>());
+const expandedTicketIds = new SvelteSet<string>();
 
 function toggleExpand(ticketId: string) {
-	const next = new Set(expandedTicketIds);
-	if (next.has(ticketId)) {
-		next.delete(ticketId);
+	if (expandedTicketIds.has(ticketId)) {
+		expandedTicketIds.delete(ticketId);
 	} else {
-		next.add(ticketId);
+		expandedTicketIds.add(ticketId);
 	}
-	expandedTicketIds = next;
 }
 
 const filteredTickets = $derived(

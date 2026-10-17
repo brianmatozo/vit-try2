@@ -16,23 +16,47 @@ El sistema funciona con **3 servicios coordinados** sin necesidad de Docker, WSL
 
 ---
 
-## 2. Instalación en 1 Clic (Asistente Automatizado)
+## 2. Distribución en 1 Archivo: Instalador de Windows (Inno Setup)
 
-1. Descargá o cloná el repositorio en tu PC con Windows (por ejemplo en `C:\vitalcer`).
-2. Hacé **doble clic** en:
+Para distribuir Vitalcer a los locales comerciales en un **instalador único profesional** (`vitalcer-setup-x64.exe`):
+
+1. **Crear el instalador**:
+   En tu máquina de desarrollo o CI con Windows e Inno Setup 6 instalado:
+   ```cmd
+   scripts\windows\package.bat
+   ```
+   El script se encarga de:
+   - Compilar y pre-comprimir el frontend estático (`admin` y `pos` con Brotli nivel 11).
+   - Descargar los binarios portables de Caddy y PostgreSQL 18.
+   - Congelar el backend FastAPI y el supervisor Tkinter en modo `--onedir` mediante PyInstaller (`scripts/windows/vitalcer.spec`).
+   - Compilar el instalador autoejecutable con compresión sólida LZMA2 (`dist\vitalcer-setup-x64.exe`).
+
+2. **Instalación en la PC del local**:
+   - El comerciante simplemente hace doble clic en `vitalcer-setup-x64.exe`.
+   - El instalador extrae los archivos en `C:\Vitalcer`.
+   - Inicializa silenciosamente el cluster y la base de datos `vitalcer`.
+   - Crea el acceso directo en el Escritorio.
+   - Permite conservar las ventas y datos al desinstalar o actualizar.
+
+---
+
+## 3. Instalación Local para Desarrollo (Modo Directo)
+
+Si estás trabajando directamente sobre el código fuente en Windows:
+1. Hacé **doble clic** en:
    ```cmd
    scripts\windows\install.bat
    ```
-3. El asistente se encargará automáticamente de:
+2. El asistente se encargará de:
    - ✅ Instalar el gestor de paquetes de Python (`uv`).
    - ✅ Descargar el servidor web seguro `caddy.exe`.
-   - ✅ Inicializar el cluster de base de datos PostgreSQL en `data\postgres\`.
+   - ✅ Descargar PostgreSQL 18 portable e inicializar el cluster en `data\postgres\`.
    - ✅ Instalar las dependencias de Python y sincronizar el entorno.
    - ✅ Crear un **acceso directo en tu Escritorio**: **"Vitalcer Control Panel"**.
 
 ---
 
-## 3. Uso del Panel de Control ("Vitalcer Control")
+## 4. Uso del Panel de Control ("Vitalcer Control")
 
 Hacé doble clic en el acceso directo del Escritorio o ejecutá:
 ```cmd
@@ -51,7 +75,7 @@ Se abrirá una ventana nativa de Windows con:
 
 ---
 
-## 4. Conectar Celulares de Mostrador (Lector de Cámara)
+## 5. Conectar Celulares de Mostrador (Lector de Cámara)
 
 Para que los cajeros o empleados usen la cámara de sus teléfonos como lector de códigos de barra:
 
@@ -68,7 +92,7 @@ Para que los cajeros o empleados usen la cámara de sus teléfonos como lector d
 
 ---
 
-## 5. Múltiples Cajeros Simultáneos (Concurrencia)
+## 6. Múltiples Cajeros Simultáneos (Concurrencia)
 
 - Cada celular tiene su **propio carrito independiente en memoria**.
 - Las ventas se graban en PostgreSQL en **transacciones atómicas**:
@@ -77,7 +101,7 @@ Para que los cajeros o empleados usen la cámara de sus teléfonos como lector d
 
 ---
 
-## 6. Solución de Problemas Frecuentes
+## 7. Solución de Problemas Frecuentes
 
 ### ¿El puerto 5432 ya está ocupado?
 Si ya tenías PostgreSQL instalado previamente en Windows, el Panel de Control lo detectará automáticamente y utilizará ese servicio existente.

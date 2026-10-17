@@ -27,7 +27,11 @@ if sys.platform == "win32":
     if sys.stderr and hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if getattr(sys, "frozen", False):
+    REPO_ROOT = Path(sys.executable).resolve().parent
+else:
+    REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
 DATA_DIR = REPO_ROOT / "data" / "postgres"
 LOGS_DIR = REPO_ROOT / "data" / "logs"
 
@@ -74,7 +78,7 @@ class ServiceProcess:
         try:
             with socket.create_connection((host, self.port), timeout=timeout):
                 return True
-        except (socket.timeout, ConnectionRefusedError, OSError):
+        except socket.timeout, ConnectionRefusedError, OSError:
             return False
 
     def is_running(self) -> bool:
@@ -136,9 +140,11 @@ class ServiceProcess:
                         for _ in range(25):
                             time.sleep(0.2)
                             if self.is_port_open():
-                                self._append_log(
-                                    f"[{self.display_name}] Activo en puerto {self.port} ✅"
+                                msg = (
+                                    f"[{self.display_name}] Activo en "
+                                    f"puerto {self.port} ✅"
                                 )
+                                self._append_log(msg)
                                 return True
                     self._append_log(
                         f"[{self.display_name}] Proceso terminó código {code} ❌"
@@ -267,14 +273,17 @@ class ServiceManager:
         )
 
         # 2. FastAPI Backend (Port 8000)
-        fastapi_cmd = self.python_cmd + [
-            "uvicorn",
-            "server.main:app",
-            "--host",
-            "0.0.0.0",
-            "--port",
-            "8000",
-        ]
+        if getattr(sys, "frozen", False):
+            fastapi_cmd = [sys.executable, "--backend"]
+        else:
+            fastapi_cmd = self.python_cmd + [
+                "uvicorn",
+                "server.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+            ]
         backend_env = {
             "PYTHONUNBUFFERED": "1",
             "DATABASE_URL": os.environ.get(
@@ -308,9 +317,8 @@ class ServiceManager:
             return False
         started = srv.start()
         if started and name == "postgres" and self.postgres_cmd:
-            createdb_bin = (
-                Path(self.postgres_cmd).parent
-                / ("createdb.exe" if IS_WINDOWS else "createdb")
+            createdb_bin = Path(self.postgres_cmd).parent / (
+                "createdb.exe" if IS_WINDOWS else "createdb"
             )
             if createdb_bin.is_file():
                 try:

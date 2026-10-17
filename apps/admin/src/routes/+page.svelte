@@ -509,7 +509,6 @@ const table = createAppTable({
   title={editingProduct ? 'Editar Producto' : 'Crear Nuevo Producto'}
   description={editingProduct ? 'Modifica los datos del artículo seleccionado.' : 'Registra un nuevo artículo discreto o a granel en el sistema.'}
 >
-  {#snippet children()}
     <form id="productForm" onsubmit={handleSaveProduct} class="space-y-4">
       {#if formError}
         <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-md flex items-center gap-2 text-rose-800 text-xs">
@@ -670,7 +669,6 @@ const table = createAppTable({
         </div>
       </div>
     </form>
-  {/snippet}
 
   {#snippet footer()}
     <Button

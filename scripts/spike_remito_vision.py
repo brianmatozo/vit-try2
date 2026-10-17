@@ -189,7 +189,8 @@ class RemitoVisionOutput(BaseModel):
     extraction_notes: list[str] = Field(
         default_factory=list,
         description=(
-            "Warnings or notes regarding scan quality, lighting, or handwriting"
+            "Escape hatch: unmodeled surcharges (IIBB, flete), payment terms, "
+            "container deposits, scan quality notes, or items not fitting the schema"
         ),
     )
 
@@ -224,10 +225,19 @@ checkmarks, ticks, crossed-out lines, or handwritten notes on the physical paper
 Do NOT attempt to read, transcribe, or detect handwriting.
 Extract the original printed descriptions, quantities, and prices as originally printed.
 
+EXTRACTION NOTES & ESCAPE HATCH (CRITICAL):
+Use the `extraction_notes` array as an escape hatch to capture any receipt \
+information that does not fit into standard line items or fiscal_info fields:
+- Fiscal surcharges: Percepciones IIBB (Ingresos Brutos), Percepción IVA, etc.
+- Logistics / Freight: Flete, costo de envío, seguro de mercadería.
+- Commercial & payment terms: Descuento contado, recargo cta cte, plazos.
+- Container deposits / returnables: Seña de cajones, pallets, envases.
+- Data anomalies: Items with $0 cost (muestras / bonificaciones), unreadable text.
+
 OUTPUT SPECIFICATION:
 Return a single JSON object matching this schema exactly:
 {
-  "supplier_name": "string",
+  "supplier_name": "string or null",
   "remito_number": "string or null",
   "date_issued": "YYYY-MM-DD or null",
   "page_count": int,
@@ -351,9 +361,7 @@ async def call_openrouter_vision(
         error_detail = response.text
         try:
             error_json = response.json()
-            error_detail = error_json.get("error", {}).get(
-                "message", error_detail
-            )
+            error_detail = error_json.get("error", {}).get("message", error_detail)
         except Exception:
             pass
         if response.status_code == 429:
@@ -685,8 +693,7 @@ def main() -> None:
         "--api-key",
         default=os.getenv("OPENROUTER_API_KEY"),
         help=(
-            "OpenRouter API key (defaults to OPENROUTER_API_KEY "
-            "environment variable)."
+            "OpenRouter API key (defaults to OPENROUTER_API_KEY environment variable)."
         ),
     )
     parser.add_argument(

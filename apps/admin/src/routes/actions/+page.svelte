@@ -374,7 +374,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
   title="Registrar Ingreso de Proveedor"
   description="Asienta una entrada de mercadería con su respectivo ticket o remito."
 >
-  {#snippet children()}
     <form id="receiveForm" onsubmit={handleReceiveSubmit} class="space-y-4">
       <div>
         <label for="receive-product" class="block text-xs font-semibold text-gray-700 mb-1">
@@ -438,7 +437,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         />
       </div>
     </form>
-  {/snippet}
 
   {#snippet footer()}
     <Button
@@ -468,7 +466,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
   title="Registrar Merma o Pérdida"
   description="Deduce stock físico por desperdicio, humedad o vencimiento."
 >
-  {#snippet children()}
     <form id="mermaForm" onsubmit={handleMermaSubmit} class="space-y-4">
       <div>
         <label for="merma-product" class="block text-xs font-semibold text-gray-700 mb-1">
@@ -533,7 +530,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         />
       </div>
     </form>
-  {/snippet}
 
   {#snippet footer()}
     <Button
@@ -564,7 +560,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
   title="Conciliación por Auditoría Física"
   description="Ajusta el saldo del sistema al conteo físico real de góndola."
 >
-  {#snippet children()}
     <form id="adjustForm" onsubmit={handleAdjustSubmit} class="space-y-4">
       <div>
         <label for="adjust-product" class="block text-xs font-semibold text-gray-700 mb-1">
@@ -642,7 +637,6 @@ async function handleAdjustSubmit(e: SubmitEvent) {
         />
       </div>
     </form>
-  {/snippet}
 
   {#snippet footer()}
     <Button

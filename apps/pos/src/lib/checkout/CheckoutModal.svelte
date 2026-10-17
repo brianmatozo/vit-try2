@@ -26,7 +26,7 @@ let { open = $bindable(false), oncomplete, oncancel }: Props = $props();
 type PaymentMethod = 'cash' | 'card' | 'qr';
 
 let paymentMethod = $state<PaymentMethod>('cash');
-let cashTendered = $state<number>(0);
+let cashTendered = $state<number>(cart.totalAmount);
 let isProcessing = $state<boolean>(false);
 let errorMessage = $state<string | null>(null);
 
@@ -42,14 +42,6 @@ let completedTicket = $state<{
 } | null>(null);
 
 const total = $derived(cart.totalAmount);
-
-$effect(() => {
-	if (open && !completedTicket) {
-		paymentMethod = 'cash';
-		cashTendered = cart.totalAmount;
-		errorMessage = null;
-	}
-});
 
 const change = $derived(cashTendered - total);
 const isCashValid = $derived(paymentMethod !== 'cash' || cashTendered >= total);
