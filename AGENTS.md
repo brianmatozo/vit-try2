@@ -99,31 +99,77 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 3. **Double-Entry Inventory**: Stock balances in `products` are never overwritten directly; all adjustments require an immutable `InventoryLedger` entry (`quantity_delta`, `movement_type`, `balance_after`, `reference_id`).
 4. **Static SPAs**: Both frontend applications in `apps/` must remain pure static SPAs (`ssr = false`, `@sveltejs/adapter-static`) with zero Node.js server dependencies in production.
 5. **HTTPS & Camera Access**: `apps/pos` must be served over HTTPS (port `5174`) for W3C Secure Context camera permissions (`navigator.mediaDevices.getUserMedia`).
-6. **Tailwind CSS v4 & Theme Architecture**:
-   - App CSS entry files (`apps/*/src/routes/layout.css`) must declare `@source "../../../../packages/ui/src";`.
-   - `packages/ui/src/theme.css` is the single source of truth for design tokens (`@theme`, `@utility`). Never import Tailwind directly inside it.
-   - **Zero Arbitrary Brackets**: Do NOT use bracketed arbitrary utilities (e.g., `text-[10px]`, `h-[40px]`). Micro-typography and dense UI clamps must use tokens defined in `@theme` (`text-2xs: 10px`, `text-3xs: 9px`).
+6. **Tailwind CSS v4 & Token Architecture**:
+* App CSS entry files (`apps/*/src/routes/layout.css`) must declare `@source "../../../../packages/ui/src";`.
+* `packages/ui/src/theme.css` is the single source of truth for design tokens (`@theme`, `@utility`). Never import Tailwind directly inside it.
+* **Zero Arbitrary Brackets**: Do NOT use arbitrary bracket utilities (e.g., `text-[10px]`, `h-[40px]`). Dense POS typography and clamps must use tokens defined in `@theme` (e.g. `--text-2xs: 10px;`, `--text-3xs: 9px;`).
+
+
 7. **Mobile-First Modals**: Modals in `@vitalcer/ui` render via portal with backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile (`< sm`), and center on desktop (`sm:`). For alerts or modals that must always center on all screens, pass `position="center"` or `centered`. Dialog footer buttons render in a `justify-end` container; use `mr-auto` (not `ml-auto`) to left-align footer actions.
 8. **Zero Autonomous Paid API Calls**: AI agents must NEVER execute scripts or commands that make live requests to external paid APIs using user credentials without explicit chat consent. Always use `--mock` mode, fixtures, or local SQLite mocks.
 
 ---
 
-## 5. Frontend & Svelte 5 Decomposition Contract
+## 5. Workspace Boundaries & Svelte 5 Architecture Contract
 
-### A. The 250 LOC Budget & Architecture Layers
-No `.svelte` or `.svelte.ts` file may exceed **250 lines of code**. If a file approaches 200 lines, decompose it immediately following the **Catalog Blueprint**:
-1. **Pure Domain Logic (`[feature].ts`)**: Math, business invariants, GS1/barcode parsers, metric calculations, and payload formatters. Must have zero UI dependencies and be tested with Vitest.
-2. **State & Runes Controller (`[feature].svelte.ts`)**: Svelte 5 reactive state (`$state`, `$derived`, `$effect`), async mutation flows, and validation state.
-3. **Subcomponents (`_components/[Name].svelte`)**: Scoped presentational leaves under 150 LOC. Receive props via `$props()`, delegate events via callbacks.
-4. **Route Coordinator (`+page.svelte`)**: Thin orchestrator strictly limited to composing the controller, subcomponents, and top-level layout.
+### A. Package & Layer Boundaries
 
-### B. Styling Standards & Scoped CSS
-- **Utility Discipline**: Never chain more than 4–5 utility classes on a single HTML tag. Keep markup clean and structural.
-- **Component-Scoped `<style>`**: For complex internal component layouts, animations, or responsive variant blocks, use native Svelte `<style>` tags at the bottom of the file rather than 100-character utility strings.
-- **Shared Primitives**: All shared components in `@vitalcer/ui` must accept an optional `class` prop and merge via `cn()`, imported strictly from `@vitalcer/ui`.
+* **`@vitalcer/core` (Domain Math & Invariants)**: Framework-agnostic pure TypeScript. GS1 barcode parsing, ARS integer currency math, and weight calculation logic. Must have zero DOM/browser dependencies and run cleanly in Node/Vitest.
+* **`@vitalcer/ui` (Design System Primitives)**: Generic, unstyled/Tailwind-styled UI primitives (Bits UI wrappers: Dialog, Button, Card, Input) and design tokens (`theme.css`). Must contain **zero domain knowledge** (no products, prices, barcodes, or cart types).
+* **`@vitalcer/api` (Network & Contracts)**: OpenAPI-generated client, Zod validation schemas, and TanStack Query option factories.
+* **`apps/*/src/lib/<domain>/` (App-Specific Features)**: State machines, browser APIs (audio synthesis, WebRTC camera streams), table column layouts, and domain view components.
 
-### C. Verification Gates
+### B. Directory & Routing Invariant
+
+* **Routes are Pure Coordinators**: `apps/*/src/routes/` is strictly reserved for SvelteKit routing artifacts (`+page.svelte`, `+layout.svelte`, `+layout.ts`, `layout.css`).
+* **Zero Route-Adjacent Helpers**: Never create helper scripts, `.svelte.ts` files, or subcomponent folders inside `src/routes/**/`. All feature logic and subcomponents must live under `apps/*/src/lib/<domain>/`.
+
+### C. The 250 LOC Feature Blueprint
+
+No `.svelte` or `.svelte.ts` file may exceed **250 lines of code**. When decomposing bloated files or adding features, organize the target domain under `apps/<app>/src/lib/<domain>/`:
+
+```
+src/lib/<domain>/
+├── <feature>-filter.ts         # Pure domain functions & metrics (no UI, tested via Vitest)
+├── <feature>-filter.test.ts    # Unit tests for domain calculations
+├── columns.ts                  # TanStack table column definitions (if tabular data)
+├── <feature>.svelte.ts         # Svelte 5 runes controller class ($state, $derived, validation)
+├── <feature>.test.ts           # Unit tests for state machine transitions
+└── components/                 # Presentational leaves (< 150 LOC each)
+    ├── <Feature>Header.svelte
+    └── <Feature>Dialog.svelte
+
+```
+
+### D. Svelte 5 Runes & Import Rules
+
+1. **Extension Dropping on `.svelte.ts` Imports**: When importing `.svelte.ts` modules into `.svelte` or `.ts` files, omit the `.ts` extension:
+```typescript
+// Correct
+import { ProductFormState } from '$lib/catalog/product-form.svelte';
+
+// WRONG - will cause bundler resolution errors
+import { ProductFormState } from '$lib/catalog/product-form.svelte.ts';
+
+```
+
+
+2. **State Lifecycle Patterns**:
+* **Ephemeral / Local State (Forms, Modals)**: Export an uninstantiated class (`export class ProductFormState { ... }`). The consuming component instantiates it: `const form = new ProductFormState()`.
+* **Persistent / Global State (POS Cart)**: Export a class alongside a shared singleton instance (`export const cart = new CartState()`).
+
+
+
+### E. Styling Standards & Scoped CSS
+
+* **Utility Discipline**: Never chain more than 4–5 utility classes on a single HTML tag. Keep markup clean, readable, and structural.
+* **Component-Scoped `<style>**`: For complex internal component layouts, animations, or responsive variant blocks, use native Svelte `<style>` tags at the bottom of the file rather than 100-character utility strings.
+* **Shared Primitives & `class` Merging**: All components in `@vitalcer/ui` must accept an optional `class` prop and merge via `cn()`, imported strictly from `@vitalcer/ui`.
+
+### F. Verification Gates
+
 Before declaring any frontend change or refactor complete, run and pass:
+
 1. `pnpm svelte-check` (zero TypeScript and Svelte warnings)
 2. `pnpm vitest run` (all unit tests passing)
 3. `pnpm biome check` (formatting and lint compliance)
