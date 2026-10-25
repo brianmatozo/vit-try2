@@ -78,7 +78,7 @@ class ServiceProcess:
         try:
             with socket.create_connection((host, self.port), timeout=timeout):
                 return True
-        except socket.timeout, ConnectionRefusedError, OSError:
+        except (socket.timeout, ConnectionRefusedError, OSError):
             return False
 
     def is_running(self) -> bool:

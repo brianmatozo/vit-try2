@@ -34,20 +34,19 @@ from pathlib import Path
 from typing import Any
 
 # Auto-bootstrap into project .venv if invoked with system/global python
-_venv_python = Path(__file__).resolve().parent.parent / ".venv" / "bin" / "python"
-if _venv_python.exists() and os.path.realpath(sys.executable) != os.path.realpath(
-    _venv_python
-):
+_venv_dir = Path(__file__).resolve().parent.parent / ".venv"
+_venv_python = _venv_dir / "bin" / "python"
+if _venv_python.exists() and sys.prefix != str(_venv_dir):
     os.execv(str(_venv_python), [str(_venv_python)] + sys.argv)
 
 import httpx  # noqa: E402
-from pydantic import BaseModel, Field  # noqa: E402
+from pydantic import BaseModel, Field, field_validator  # noqa: E402
 
 # Try loading .env if available
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    load_dotenv(override=True)
 except ImportError:
     pass
 
@@ -78,11 +77,11 @@ MODEL_PRESETS: dict[str, str] = {
     "deepseek": "deepseek/deepseek-v4.1-flash",
     "deepseek-flash": "deepseek/deepseek-v4.1-flash",
     "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash",
-    # Anthropic models
+    # Anthropic models BANNED
     "claude": "anthropic/claude-sonnet-4.5",
     "sonnet": "anthropic/claude-sonnet-4.5",
     "haiku": "anthropic/claude-haiku-4.5",
-    # OpenAI models
+    # OpenAI models BANNED
     "gpt-4o": "openai/gpt-4o",
     "gpt-4o-mini": "openai/gpt-4o-mini",
     # Open source vision models
@@ -132,6 +131,22 @@ class ExtractedLineItem(BaseModel):
         description="Extraction confidence percentage (0-100)",
     )
 
+    @field_validator("unit_cost", "line_total", "quantity", mode="before")
+    @classmethod
+    def coerce_to_rounded_int(cls, v: Any) -> int:
+        """Ensure float or string prices/quantities round to whole ARS integers."""
+        if v is None:
+            return 0
+        if isinstance(v, (int, float)):
+            return round(v)
+        if isinstance(v, str):
+            try:
+                cleaned = v.replace("$", "").replace(" ", "").replace(",", ".")
+                return round(float(cleaned))
+            except ValueError:
+                return 0
+        return int(v)
+
 
 class ExtractedFiscalInfo(BaseModel):
     """Fiscal totals and split information extracted from receipt header/footer."""
@@ -160,6 +175,35 @@ class ExtractedFiscalInfo(BaseModel):
         default=None,
         description="IVA rate printed on receipt (e.g. 21)",
     )
+
+    @field_validator(
+        "subtotal",
+        "total",
+        "discount_percentage",
+        "blanco_percentage",
+        "negro_percentage",
+        "iva_percentage",
+        mode="before",
+    )
+    @classmethod
+    def coerce_optional_int(cls, v: Any) -> int | None:
+        """Coerce fiscal floats/strings into rounded whole ARS integers or None."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return round(v)
+        if isinstance(v, str):
+            try:
+                cleaned = (
+                    v.replace("$", "")
+                    .replace("%", "")
+                    .replace(" ", "")
+                    .replace(",", ".")
+                )
+                return round(float(cleaned))
+            except ValueError:
+                return None
+        return int(v)
 
 
 class RemitoVisionOutput(BaseModel):
@@ -233,6 +277,12 @@ information that does not fit into standard line items or fiscal_info fields:
 - Commercial & payment terms: Descuento contado, recargo cta cte, plazos.
 - Container deposits / returnables: Seña de cajones, pallets, envases.
 - Data anomalies: Items with $0 cost (muestras / bonificaciones), unreadable text.
+
+STOPPING & COMPLETION RULE (CRITICAL):
+- Extract each printed line item exactly ONCE.
+- NEVER repeat or loop identical line items.
+- When all printed lines from the receipt image(s) have been extracted, \
+STOP the items list immediately and proceed to "fiscal_info".
 
 OUTPUT SPECIFICATION:
 Return a single JSON object matching this schema exactly:
@@ -333,6 +383,11 @@ async def call_openrouter_vision(
         ],
         "temperature": temperature,
         "max_tokens": max_tokens,
+        "frequency_penalty": 0.2,
+        "provider": {
+            "only": ["google-ai-studio/flex"],
+            "allow_fallbacks": False,
+        },
     }
 
     # Only pass response_format for models with proven JSON-mode support.
@@ -344,12 +399,12 @@ async def call_openrouter_vision(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": "https://vitalcer.app",
-        "X-Title": "Vitalcer Remito Ingestion Spike",
+        "X-OpenRouter-Title": "Vitalcer Remito Ingestion Spike",
         "Content-Type": "application/json",
     }
 
     start_time = time.perf_counter()
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
@@ -430,11 +485,40 @@ async def call_openrouter_vision(
 
     try:
         parsed = RemitoVisionOutput.model_validate_json(cleaned_content)
-    except Exception as err:
-        raise RuntimeError(
-            f"Failed to parse model output into RemitoVisionOutput schema: {err}\n"
-            f"Raw model response was:\n{raw_content}"
-        ) from err
+    except Exception:
+        # Attempt recovery if JSON was cut off mid-list by token limit
+        try:
+            last_item_end = raw_content.rfind("}")
+            if last_item_end != -1 and '"items":' in raw_content:
+                repaired = (
+                    raw_content[start_brace : last_item_end + 1]
+                    + '\n  ],\n  "fiscal_info": null,\n  "overall_confidence": 75,\n  '
+                    '"extraction_notes": ["Token limit reached; repaired JSON."]\n}'
+                )
+                parsed = RemitoVisionOutput.model_validate_json(repaired)
+            else:
+                raise
+        except Exception as err:
+            raise RuntimeError(
+                f"Failed to parse model output into RemitoVisionOutput schema: {err}\n"
+                f"Raw model response was:\n{raw_content}"
+            ) from err
+
+    # Deduplicate consecutive runaway items if model looped
+    deduped_items: list[ExtractedLineItem] = []
+    for item in parsed.items:
+        if (
+            not deduped_items
+            or item.raw_description.strip().lower()
+            != deduped_items[-1].raw_description.strip().lower()
+        ):
+            deduped_items.append(item)
+    if len(deduped_items) < len(parsed.items):
+        pruned_count = len(parsed.items) - len(deduped_items)
+        parsed.items = deduped_items
+        parsed.extraction_notes.append(
+            f"Pruned {pruned_count} runaway repeated items from model loop."
+        )
 
     usage = res_json.get("usage", {})
     return parsed, usage, elapsed
@@ -681,11 +765,11 @@ def main() -> None:
     parser.add_argument(
         "-m",
         "--model",
-        default="gemini",
+        default="gemini-lite",
         help=(
             "Model identifier or preset alias. Available presets: "
             + ", ".join(f"'{k}'" for k in MODEL_PRESETS.keys())
-            + ". Default: 'gemini' (google/gemini-2.0-flash-001)."
+            + ". Default: 'gemini-lite' (google/gemini-2.5-flash-lite)."
         ),
     )
     parser.add_argument(
@@ -798,6 +882,9 @@ def main() -> None:
             )
         )
     except Exception as e:
+        import traceback
+
+        traceback.print_exc()
         print(f"\nExtraction failed: {e}", file=sys.stderr)
         sys.exit(1)
 
