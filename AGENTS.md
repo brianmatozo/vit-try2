@@ -94,25 +94,44 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 
 ## 4. Critical Architecture & Domain Invariants
 
-1. **Token Efficiency**: Do **NOT** read `SPECIFICATION.md` or large source trees upfront. Only consult `SPECIFICATION.md` on-demand for complex domain rules.
+1. **Token Efficiency**: Do NOT read `SPECIFICATION.md` or large source trees upfront. Only consult documentation on-demand for specific domain logic.
 2. **Currency**: All prices are stored and calculated as **integers in whole Argentine Pesos (ARS)** (e.g. $1,500 ARS = `1500`). Cents/centavos are strictly forbidden.
-3. **Double-Entry Inventory**: Stock balances in `products` are **never** overwritten directly; all adjustments require an immutable `InventoryLedger` entry (`quantity_delta`, `movement_type`, `balance_after`, `reference_id`).
+3. **Double-Entry Inventory**: Stock balances in `products` are never overwritten directly; all adjustments require an immutable `InventoryLedger` entry (`quantity_delta`, `movement_type`, `balance_after`, `reference_id`).
 4. **Static SPAs**: Both frontend applications in `apps/` must remain pure static SPAs (`ssr = false`, `@sveltejs/adapter-static`) with zero Node.js server dependencies in production.
-5. **HTTPS & Camera Access**: `apps/pos` must be served over **HTTPS** (port `5174`) because browsers require a W3C Secure Context for `navigator.mediaDevices.getUserMedia`.
-6. **Tailwind CSS v4 Workspace Scanning**: App CSS entry files (`apps/*/src/routes/layout.css`) must explicitly declare `@source "../../../../packages/ui/src";` so Tailwind compiles utilities used inside `@vitalcer/ui`. `packages/ui/src/theme.css` must only define `@theme` and `@utility` rules (never `@import "tailwindcss"` or `@source "./"`).
-7. **Mobile-First Modals**: Modals in `@vitalcer/ui` render via portal with backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile (`< sm`) with internal scrolling and fixed actions, and center on desktop (`sm:`). For alerts or modals that must always center on all screens, pass `position="center"` or `centered`.
-8. **Zero Autonomous Paid API Calls**: AI agents must NEVER execute scripts or commands that make live requests to external paid APIs (OpenRouter, LLM inference endpoints) using user credentials without explicit chat consent. Development, tests, and CI/tooling verification must strictly use `--mock` mode, recorded JSON fixtures, or local SQLite mocks.
-9. **Frontend Styling & Component Contract**:
-   - **Zero Scoped `<style>`**: Never write `<style>` blocks in `.svelte` files for layout or positioning. Use Tailwind utility classes exclusively.
-   - **Component `class` Merging**: All components in `@vitalcer/ui` must accept an optional `class` prop and merge it onto the root element via `cn()`.
-   - **Single Source of `cn()`**: Always import `cn` from `@vitalcer/ui` (`import { cn } from '@vitalcer/ui'`). Never re-implement `cn()` in application code.
-   - **Dialog Positioning Contract**: Modals default to bottom-sheets on mobile (`position="bottom"`). For alerts, confirmations, or modals that must be centered across all viewports, explicitly pass `position="center"` (or `centered`). Dialog footer buttons render in a `justify-end` container; use `mr-auto` (not `ml-auto`) to left-align footer actions.
-   - **Monorepo Dependency Hygiene**: Never duplicate packages between `packages/ui` and apps unless directly imported. Shared packages must maintain lockstep versions (e.g., `zod ^3.24.2`).
-   - DO NOT GO OVER 250 LOC
+5. **HTTPS & Camera Access**: `apps/pos` must be served over HTTPS (port `5174`) for W3C Secure Context camera permissions (`navigator.mediaDevices.getUserMedia`).
+6. **Tailwind CSS v4 & Theme Architecture**:
+   - App CSS entry files (`apps/*/src/routes/layout.css`) must declare `@source "../../../../packages/ui/src";`.
+   - `packages/ui/src/theme.css` is the single source of truth for design tokens (`@theme`, `@utility`). Never import Tailwind directly inside it.
+   - **Zero Arbitrary Brackets**: Do NOT use bracketed arbitrary utilities (e.g., `text-[10px]`, `h-[40px]`). Micro-typography and dense UI clamps must use tokens defined in `@theme` (`text-2xs: 10px`, `text-3xs: 9px`).
+7. **Mobile-First Modals**: Modals in `@vitalcer/ui` render via portal with backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile (`< sm`), and center on desktop (`sm:`). For alerts or modals that must always center on all screens, pass `position="center"` or `centered`. Dialog footer buttons render in a `justify-end` container; use `mr-auto` (not `ml-auto`) to left-align footer actions.
+8. **Zero Autonomous Paid API Calls**: AI agents must NEVER execute scripts or commands that make live requests to external paid APIs using user credentials without explicit chat consent. Always use `--mock` mode, fixtures, or local SQLite mocks.
 
 ---
 
-## 5. Implementation Status & Roadmap
+## 5. Frontend & Svelte 5 Decomposition Contract
+
+### A. The 250 LOC Budget & Architecture Layers
+No `.svelte` or `.svelte.ts` file may exceed **250 lines of code**. If a file approaches 200 lines, decompose it immediately following the **Catalog Blueprint**:
+1. **Pure Domain Logic (`[feature].ts`)**: Math, business invariants, GS1/barcode parsers, metric calculations, and payload formatters. Must have zero UI dependencies and be tested with Vitest.
+2. **State & Runes Controller (`[feature].svelte.ts`)**: Svelte 5 reactive state (`$state`, `$derived`, `$effect`), async mutation flows, and validation state.
+3. **Subcomponents (`_components/[Name].svelte`)**: Scoped presentational leaves under 150 LOC. Receive props via `$props()`, delegate events via callbacks.
+4. **Route Coordinator (`+page.svelte`)**: Thin orchestrator strictly limited to composing the controller, subcomponents, and top-level layout.
+
+### B. Styling Standards & Scoped CSS
+- **Utility Discipline**: Never chain more than 4–5 utility classes on a single HTML tag. Keep markup clean and structural.
+- **Component-Scoped `<style>`**: For complex internal component layouts, animations, or responsive variant blocks, use native Svelte `<style>` tags at the bottom of the file rather than 100-character utility strings.
+- **Shared Primitives**: All shared components in `@vitalcer/ui` must accept an optional `class` prop and merge via `cn()`, imported strictly from `@vitalcer/ui`.
+
+### C. Verification Gates
+Before declaring any frontend change or refactor complete, run and pass:
+1. `pnpm svelte-check` (zero TypeScript and Svelte warnings)
+2. `pnpm vitest run` (all unit tests passing)
+3. `pnpm biome check` (formatting and lint compliance)
+4. Production build (`make check` or static adapter build)
+
+---
+
+## 6. Implementation Status & Roadmap
 
 - ✅ **Phase 1 (Data & Models)**: SQLModel database (`Product`, `User`, `InventoryLedger`), whole ARS integers, dual Postgres/SQLite test harness.
 - ✅ **Phase 2 (Mobile POS Cashier)**: Barcode camera scanner with GPU detector, cart state machine in Svelte 5 runes, Web Audio tones, Cash change calculation & payment modal, atomic batch checkout committing to ledger (`movement_type = 'sale_pos'`).
@@ -125,7 +144,7 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 
 ---
 
-## 6. Tooling & Infrastructure Ledger
+## 7. Tooling & Infrastructure Ledger
 
 | Date | Change Summary | Affected Components |
 | :--- | :--- | :--- |
@@ -141,3 +160,4 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 | **2026-10-14** | Synchronized devenv 2.4.0 lockfile, configured `pass` in `services.postgres.initialDatabases`, pruned redundant `postgresql_18` from `packages` (benefiting from PostgreSQL binary-only shell isolation), updated Biome schema to 2.5.15, and relaxed pnpm `devEngines` for NixOS. | `devenv.nix`, `devenv.lock`, `biome.json`, `package.json`, `AGENTS.md` |
 | **2026-10-15** | Fixed Windows automation & PostgreSQL runner: added auto-download of portable PostgreSQL 18 into `tools/pgsql`, automatic `vitalcer` DB creation, console UTF-8 reconfigure to prevent emoji charmap errors, WindowsSelectorEventLoopPolicy for async psycopg3, and added `tools/`, `data/`, `server/data/` to `.gitignore`. | `scripts/windows/`, `server/core/db.py`, `.gitignore`, `AGENTS.md` |
 | **2026-10-16** | Added Windows Inno Setup installer pipeline (`vitalcer.iss`, `package.ps1`/`package.bat`, `vitalcer.spec`), dual-mode backend execution in `vitalcer_control.py`, frozen app path resolution in `service_manager.py`, accelerated portable PostgreSQL download, and `data/logs` auto-provisioning. | `scripts/windows/`, `pyproject.toml`, `docs/WINDOWS_SETUP.md`, `.gitignore`, `AGENTS.md` |
+| **2026-10-25** | Added Vitest to `apps/admin` devDependencies (`vitest ^3.0.0`) and configured `"test": "vitest run"` script for unit testing catalog TypeScript & rune modules. | `apps/admin/package.json`, `AGENTS.md` |
