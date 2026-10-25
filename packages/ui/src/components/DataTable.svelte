@@ -27,7 +27,7 @@ let { table, class: className = '' }: DataTableProps<TData> = $props();
             <th
               scope="col"
               class={cn(
-                'px-3 sm:px-4 py-2 sm:py-3 font-semibold text-[11px] sm:text-xs',
+                'px-3 sm:px-4 py-2 sm:py-3 font-semibold text-2xs sm:text-xs',
                 metaClass,
                 header.column.getCanSort() && 'cursor-pointer hover:bg-gray-100'
               )}

@@ -112,14 +112,14 @@ const table = createAppTable({
       <span class="font-medium text-gray-900 leading-tight">{product.name}</span>
       <span class="md:hidden inline-flex items-center gap-1">
         {#if product.product_type === 'bulk'}
-          <Badge variant="success" class="text-[9px] px-1 py-0">Granel</Badge>
+          <Badge variant="success" class="text-3xs px-1 py-0">Granel</Badge>
         {/if}
         {#if !product.is_active}
-          <Badge variant="destructive" class="text-[9px] px-1 py-0">Inactivo</Badge>
+          <Badge variant="destructive" class="text-3xs px-1 py-0">Inactivo</Badge>
         {/if}
       </span>
     </div>
-    <div class="text-[10px] sm:text-[11px] text-gray-400 font-mono flex items-center gap-1.5 mt-0.5 md:hidden">
+    <div class="text-2xs sm:text-xs text-gray-400 font-mono flex items-center gap-1.5 mt-0.5 md:hidden">
       <span>{product.sku}</span>
       {#if product.plu_code}
         <span>• PLU {product.plu_code}</span>

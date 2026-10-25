@@ -263,7 +263,7 @@ function handleClose() {
 
 					<!-- Bill Presets -->
 					<div class="space-y-1">
-						<div class="text-[11px] font-semibold text-neutral-500">Billetes frecuentes:</div>
+						<div class="text-xs font-semibold text-neutral-500">Billetes frecuentes:</div>
 						<div class="grid grid-cols-4 gap-1.5">
 							<button
 								type="button"

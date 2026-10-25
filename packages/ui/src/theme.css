@@ -6,6 +6,11 @@
 	--color-accent: #f59e0b;
 	--color-destructive: #ef4444;
 	--color-destructive-foreground: #ffffff;
+
+	--text-2xs: 10px;
+	--text-2xs--line-height: 14px;
+	--text-3xs: 9px;
+	--text-3xs--line-height: 12px;
 }
 
 @utility no-scrollbar {

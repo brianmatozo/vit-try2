@@ -135,17 +135,17 @@ const table = createAppTable({
 
 {#snippet movementTypeSnippet(type: InventoryMovementType)}
   {#if type === 'receiving'}
-    <Badge variant="success" class="text-[10px] sm:text-xs">Entrada</Badge>
+    <Badge variant="success" class="text-2xs sm:text-xs">Entrada</Badge>
   {:else if type === 'sale_pos'}
-    <Badge variant="default" class="text-[10px] sm:text-xs">Mostrador</Badge>
+    <Badge variant="default" class="text-2xs sm:text-xs">Mostrador</Badge>
   {:else if type === 'delivery_fulfilled'}
-    <Badge variant="outline" class="text-[10px] sm:text-xs">Delivery</Badge>
+    <Badge variant="outline" class="text-2xs sm:text-xs">Delivery</Badge>
   {:else if type === 'shrinkage_merma'}
-    <Badge variant="destructive" class="text-[10px] sm:text-xs">Merma</Badge>
+    <Badge variant="destructive" class="text-2xs sm:text-xs">Merma</Badge>
   {:else if type === 'manual_adjustment'}
-    <Badge variant="warning" class="text-[10px] sm:text-xs">Ajuste</Badge>
+    <Badge variant="warning" class="text-2xs sm:text-xs">Ajuste</Badge>
   {:else}
-    <Badge variant="default" class="text-[10px] sm:text-xs">{type}</Badge>
+    <Badge variant="default" class="text-2xs sm:text-xs">{type}</Badge>
   {/if}
 {/snippet}
 

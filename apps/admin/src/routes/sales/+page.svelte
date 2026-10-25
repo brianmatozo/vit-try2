@@ -419,7 +419,7 @@ async function handleRefresh() {
 									<span class="font-mono font-bold text-sm text-gray-900 tracking-tight">
 										#{ticket.ticketId}
 									</span>
-									<Badge variant="outline" class="text-[11px] font-medium py-0 px-2 bg-gray-50 text-gray-600">
+									<Badge variant="outline" class="text-xs font-medium py-0 px-2 bg-gray-50 text-gray-600">
 										{ticket.items.length} {ticket.items.length === 1 ? 'artículo' : 'artículos'}
 									</Badge>
 								</div>
@@ -476,15 +476,15 @@ async function handleRefresh() {
 											<tr class="hover:bg-gray-50/75 transition-colors">
 												<td class="py-2.5 px-3">
 													<div class="font-bold text-gray-900">{item.productName}</div>
-													<div class="text-[11px] text-gray-400 font-mono">{item.sku}</div>
+													<div class="text-xs text-gray-400 font-mono">{item.sku}</div>
 												</td>
 												<td class="py-2.5 px-3">
 													{#if item.productType === 'bulk'}
-														<Badge variant="outline" class="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+														<Badge variant="outline" class="text-2xs bg-purple-50 text-purple-700 border-purple-200">
 															Granel
 														</Badge>
 													{:else}
-														<Badge variant="outline" class="text-[10px] bg-sky-50 text-sky-700 border-sky-200">
+														<Badge variant="outline" class="text-2xs bg-sky-50 text-sky-700 border-sky-200">
 															Unidad
 														</Badge>
 													{/if}
@@ -510,7 +510,7 @@ async function handleRefresh() {
 													<a
 														href={`/ledger?product_id=${item.productId}`}
 														title="Ver auditoría de movimientos"
-														class="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 hover:underline font-semibold"
+														class="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 hover:underline font-semibold"
 													>
 														<span>Ver</span>
 														<ExternalLink class="w-3 h-3" />
@@ -521,7 +521,7 @@ async function handleRefresh() {
 									</tbody>
 									<tfoot class="bg-gray-50/80 border-t border-gray-200 font-bold text-gray-900">
 										<tr>
-											<td colspan="4" class="py-2.5 px-3 text-right uppercase text-[11px] tracking-wider text-gray-500">
+											<td colspan="4" class="py-2.5 px-3 text-right uppercase text-xs tracking-wider text-gray-500">
 												Total Ticket:
 											</td>
 											<td class="py-2.5 px-3 text-right text-emerald-700 text-sm font-black font-mono">

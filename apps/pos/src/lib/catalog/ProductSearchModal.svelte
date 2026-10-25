@@ -158,18 +158,18 @@ function handleClose() {
 							</div>
 							<div class="flex items-center gap-1.5 mt-1 flex-wrap">
 								{#if product.product_type === 'bulk'}
-									<span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-200">
+									<span class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-900 border border-amber-200">
 										<Scale class="w-3 h-3 text-amber-700" />
 										PLU {product.plu_code || '-'}
 									</span>
 								{:else}
-									<span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-medium bg-neutral-100 text-neutral-700">
+									<span class="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded font-medium bg-neutral-100 text-neutral-700">
 										<Package class="w-3 h-3 text-neutral-500" />
 										{product.sku}
 									</span>
 								{/if}
 
-								<span class="text-[11px] text-neutral-400">
+								<span class="text-xs text-neutral-400">
 									Stock: {product.product_type === 'bulk' ? formatWeight(product.current_stock) : `${product.current_stock} un.`}
 								</span>
 							</div>
@@ -180,11 +180,11 @@ function handleClose() {
 								{formatARS(product.unit_price)}
 							</div>
 							{#if product.product_type === 'bulk'}
-								<div class="text-[11px] text-neutral-400 font-medium">
+								<div class="text-xs text-neutral-400 font-medium">
 									/ {product.bulk_reference_grams || 100}g
 								</div>
 							{:else}
-								<div class="text-[11px] text-neutral-400 font-medium">
+								<div class="text-xs text-neutral-400 font-medium">
 									/ unidad
 								</div>
 							{/if}

@@ -79,7 +79,7 @@ let { form, isSubmitting, onSubmit }: Props = $props();
             placeholder="Ej: 0142"
             bind:value={form.pluCode}
           />
-          <span class="text-[10px] text-emerald-700 mt-0.5 block">Para balanza EAN-13 (prefijo 20)</span>
+          <span class="text-2xs text-emerald-700 mt-0.5 block">Para balanza EAN-13 (prefijo 20)</span>
         </div>
 
         <div>
@@ -93,7 +93,7 @@ let { form, isSubmitting, onSubmit }: Props = $props();
             bind:value={form.bulkReferenceGrams}
             required
           />
-          <span class="text-[10px] text-emerald-700 mt-0.5 block">Precio cada N gramos (ej: 100g)</span>
+          <span class="text-2xs text-emerald-700 mt-0.5 block">Precio cada N gramos (ej: 100g)</span>
         </div>
       </div>
     {/if}
@@ -139,7 +139,7 @@ let { form, isSubmitting, onSubmit }: Props = $props();
           placeholder="0"
           bind:value={form.minSafetyBuffer}
         />
-        <span class="text-[10px] text-gray-500 mt-0.5 block">Reserva no publicada en apps</span>
+        <span class="text-2xs text-gray-500 mt-0.5 block">Reserva no publicada en apps</span>
       </div>
     </div>
 
@@ -155,7 +155,7 @@ let { form, isSubmitting, onSubmit }: Props = $props();
       </label>
 
       <div>
-        <div class="text-[11px] text-gray-500 font-medium mb-1.5">Sincronización con canales de delivery:</div>
+        <div class="text-xs text-gray-500 font-medium mb-1.5">Sincronización con canales de delivery:</div>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-700">
           <label class="flex items-center gap-1.5 p-2 rounded-md border border-gray-200 bg-gray-50/50 hover:bg-gray-50 cursor-pointer transition-colors">
             <input type="checkbox" bind:checked={form.syncPedidosya} class="rounded border-gray-300 text-emerald-600 w-3.5 h-3.5" />
