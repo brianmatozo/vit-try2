@@ -2,7 +2,7 @@
 
 {
   dotenv.enable = true;
-  # Environment variables
+
   env = {
     # Let uv manage standalone Python 3.14 toolchains hermetically
     UV_PYTHON_PREFERENCE = "managed";

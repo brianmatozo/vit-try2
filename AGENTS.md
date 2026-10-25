@@ -108,6 +108,7 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
    - **Single Source of `cn()`**: Always import `cn` from `@vitalcer/ui` (`import { cn } from '@vitalcer/ui'`). Never re-implement `cn()` in application code.
    - **Dialog Positioning Contract**: Modals default to bottom-sheets on mobile (`position="bottom"`). For alerts, confirmations, or modals that must be centered across all viewports, explicitly pass `position="center"` (or `centered`). Dialog footer buttons render in a `justify-end` container; use `mr-auto` (not `ml-auto`) to left-align footer actions.
    - **Monorepo Dependency Hygiene**: Never duplicate packages between `packages/ui` and apps unless directly imported. Shared packages must maintain lockstep versions (e.g., `zod ^3.24.2`).
+   - DO NOT GO OVER 250 LOC
 
 ---
 
