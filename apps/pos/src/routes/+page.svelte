@@ -3,37 +3,21 @@ import { createQuery } from '@tanstack/svelte-query';
 import {
 	type ProductResponse,
 	productReadMultiApiV1ProductsGetOptions,
-	scanBarcode,
 } from '@vitalcer/api';
-import {
-	calculateWeightFromPrice,
-	formatARS,
-	formatWeight,
-	parseBarcode,
-} from '@vitalcer/core';
-import { Button, Dialog } from '@vitalcer/ui';
-import {
-	AlertCircle,
-	Camera,
-	CameraOff,
-	CheckCircle,
-	ChevronDown,
-	ChevronUp,
-	Minus,
-	Package,
-	Plus,
-	Scale,
-	Search,
-	ShoppingBag,
-	Trash2,
-	Volume2,
-} from 'lucide-svelte';
-import { playBeep, playError } from '$lib/audio/sound';
-import CameraScanner from '$lib/camera/CameraScanner.svelte';
-import { type CartItem, cart } from '$lib/cart/cart.svelte';
+import { cart } from '$lib/cart/cart.svelte';
 import ManualWeightModal from '$lib/catalog/ManualWeightModal.svelte';
 import ProductSearchModal from '$lib/catalog/ProductSearchModal.svelte';
 import CheckoutModal from '$lib/checkout/CheckoutModal.svelte';
+import CartEmptyState from '$lib/counter/components/CartEmptyState.svelte';
+import CartItemList from '$lib/counter/components/CartItemList.svelte';
+import ClearCartModal from '$lib/counter/components/ClearCartModal.svelte';
+import CounterCamera from '$lib/counter/components/CounterCamera.svelte';
+import CounterFooter from '$lib/counter/components/CounterFooter.svelte';
+import CounterHeader from '$lib/counter/components/CounterHeader.svelte';
+import CounterNotification from '$lib/counter/components/CounterNotification.svelte';
+import { CounterState } from '$lib/counter/counter-state.svelte';
+
+const counter = new CounterState();
 
 // Preload product catalog into TanStack Query memory cache for 0ms offline-tolerant scans
 const productsQuery = createQuery(() =>
@@ -49,242 +33,6 @@ const products = $derived<ProductResponse[]>(
 			? (productsQuery.data as ProductResponse[])
 			: [],
 );
-
-// Scanner state
-let isCameraActive = $state(true);
-let isCameraCollapsed = $state(false);
-
-// Modals
-let isSearchOpen = $state(false);
-let isWeightModalOpen = $state(false);
-let isCheckoutOpen = $state(false);
-let isClearConfirmOpen = $state(false);
-
-// Bulk item weight editing
-let activeWeightProduct = $state<ProductResponse | null>(null);
-let activeWeightItemId = $state<string | null>(null);
-let initialWeightGrams = $state(100);
-
-// Notification banner
-let notification = $state<{
-	message: string;
-	type: 'success' | 'error' | 'info';
-} | null>(null);
-let notificationTimer: ReturnType<typeof setTimeout> | null = null;
-
-function showNotification(
-	message: string,
-	type: 'success' | 'error' | 'info' = 'info',
-) {
-	if (notificationTimer) clearTimeout(notificationTimer);
-	notification = { message, type };
-	notificationTimer = setTimeout(() => {
-		notification = null;
-	}, 2800);
-}
-
-// Unified barcode scan handler: fast local cache first, backend fallback second
-async function handleBarcodeScan(barcode: string) {
-	const clean = barcode.trim();
-	if (!clean) return;
-
-	// 1. Try instant client lookup from preloaded in-memory catalog (0ms, offline-tolerant)
-	const parsed = parseBarcode(clean);
-	let prod: ProductResponse | undefined;
-
-	if (products.length > 0) {
-		if (parsed.isEmbeddedWeight) {
-			prod = products.find(
-				(p) =>
-					p.plu_code &&
-					p.plu_code.toLowerCase() === parsed.skuOrPlu.toLowerCase(),
-			);
-		} else {
-			prod = products.find(
-				(p) =>
-					p.sku.toLowerCase() === clean.toLowerCase() ||
-					(p.plu_code && p.plu_code.toLowerCase() === clean.toLowerCase()),
-			);
-		}
-	}
-
-	if (prod) {
-		const isScaleItem =
-			parsed.isEmbeddedScale ||
-			parsed.isEmbeddedPrice ||
-			parsed.isEmbeddedWeight;
-		if (prod.product_type === 'bulk' && !isScaleItem) {
-			activeWeightProduct = prod;
-			activeWeightItemId = null;
-			initialWeightGrams = prod.bulk_reference_grams || 100;
-			isWeightModalOpen = true;
-			await playBeep();
-			return;
-		}
-
-		let weightGrams = parsed.weightGrams;
-		let lineTotal: number | undefined;
-
-		if (parsed.isEmbeddedPrice && parsed.embeddedPriceWholeArs !== undefined) {
-			lineTotal = parsed.embeddedPriceWholeArs;
-			const refGrams =
-				prod.bulk_reference_grams && prod.bulk_reference_grams > 0
-					? prod.bulk_reference_grams
-					: 100;
-			weightGrams = calculateWeightFromPrice(
-				prod.unit_price,
-				refGrams,
-				lineTotal,
-			);
-		}
-
-		cart.addItem(prod, {
-			weightGrams,
-			lineTotal,
-			rawBarcode: parsed.rawBarcode,
-		});
-
-		await playBeep();
-		showNotification(`+ ${prod.name}`, 'success');
-		return;
-	}
-
-	// 2. Fallback to server endpoint if not found in client cache
-	try {
-		const res = await scanBarcode({
-			path: { barcode: clean },
-		});
-
-		if (res.data) {
-			const scanResult = res.data;
-			const serverProd = scanResult.product;
-
-			if (
-				serverProd.product_type === 'bulk' &&
-				!scanResult.is_embedded_weight
-			) {
-				activeWeightProduct = serverProd;
-				activeWeightItemId = null;
-				initialWeightGrams = serverProd.bulk_reference_grams || 100;
-				isWeightModalOpen = true;
-				await playBeep();
-				return;
-			}
-
-			cart.addItem(serverProd, {
-				weightGrams: scanResult.weight_grams ?? undefined,
-				lineTotal: scanResult.line_total,
-				rawBarcode: scanResult.raw_barcode,
-			});
-
-			await playBeep();
-			showNotification(`+ ${serverProd.name}`, 'success');
-		} else if (res.error) {
-			const errPayload = res.error as Record<string, unknown> | undefined;
-			const msg =
-				typeof errPayload?.detail === 'string'
-					? errPayload.detail
-					: `Código no encontrado: ${clean}`;
-			await playError();
-			showNotification(msg, 'error');
-		}
-	} catch (err: unknown) {
-		const error = err as Error;
-		console.error('Scan error:', error);
-		await playError();
-		showNotification(`Código no encontrado: ${clean}`, 'error');
-	}
-}
-
-// Global Hardware Barcode Scanner (HID Keyboard) listener
-let barcodeBuffer = '';
-let lastKeyTime = 0;
-
-function handleGlobalKeydown(e: KeyboardEvent) {
-	// If cashier is typing in an input or textarea, let normal typing happen
-	const target = e.target as HTMLElement | null;
-	if (
-		target &&
-		(target.tagName === 'INPUT' ||
-			target.tagName === 'TEXTAREA' ||
-			target.isContentEditable)
-	) {
-		return;
-	}
-
-	const now = Date.now();
-	// Scanners fire keystrokes in rapid succession (< 50ms per key)
-	if (now - lastKeyTime > 200) {
-		barcodeBuffer = '';
-	}
-	lastKeyTime = now;
-
-	if (e.key === 'Enter') {
-		if (barcodeBuffer.trim().length >= 3) {
-			e.preventDefault();
-			const scannedCode = barcodeBuffer.trim();
-			barcodeBuffer = '';
-			handleBarcodeScan(scannedCode);
-		}
-	} else if (e.key.length === 1) {
-		barcodeBuffer += e.key;
-	}
-}
-
-// Product search selection handler
-function handleProductSelect(product: ProductResponse) {
-	if (product.product_type === 'bulk') {
-		activeWeightProduct = product;
-		activeWeightItemId = null;
-		initialWeightGrams = product.bulk_reference_grams || 100;
-		isWeightModalOpen = true;
-	} else {
-		cart.addItem(product);
-		playBeep();
-		showNotification(`+ ${product.name}`, 'success');
-	}
-}
-
-// Weight confirmation handler
-function handleWeightConfirm(weightGrams: number) {
-	if (activeWeightItemId) {
-		// Editing existing cart item
-		cart.updateWeight(activeWeightItemId, weightGrams);
-		playBeep();
-		showNotification(
-			`Peso actualizado a ${formatWeight(weightGrams)}`,
-			'success',
-		);
-	} else if (activeWeightProduct) {
-		// Adding new item
-		cart.addItem(activeWeightProduct, { weightGrams });
-		playBeep();
-		showNotification(
-			`+ ${activeWeightProduct.name} (${formatWeight(weightGrams)})`,
-			'success',
-		);
-	}
-
-	activeWeightProduct = null;
-	activeWeightItemId = null;
-}
-
-function handleEditItemWeight(item: CartItem) {
-	activeWeightProduct = item.product;
-	activeWeightItemId = item.id;
-	initialWeightGrams = item.weightGrams || 100;
-	isWeightModalOpen = true;
-}
-
-function handleClearCart() {
-	cart.clearCart();
-	isClearConfirmOpen = false;
-	showNotification('Carrito vaciado', 'info');
-}
-
-function handleCheckoutSuccess() {
-	cart.clearCart();
-}
 </script>
 
 <svelte:head>
@@ -292,328 +40,82 @@ function handleCheckoutSuccess() {
 	<title>Vitalcer POS Móvil</title>
 </svelte:head>
 
-<svelte:window onkeydown={handleGlobalKeydown} />
+<svelte:window onkeydown={(e) => counter.handleKeydown(e, products)} />
 
 <div class="max-w-md mx-auto w-full min-h-dvh flex flex-col bg-neutral-950 text-neutral-100 selection:bg-emerald-500 selection:text-white">
-	<!-- Top Action Bar (Compact) -->
-	<header class="px-3 py-2 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 flex items-center justify-between shrink-0 sticky top-0 z-30">
-		<div class="flex items-center gap-2 text-xs font-semibold text-neutral-400">
-			{#if !cart.isEmpty}
-				<span class="text-emerald-400 font-bold">{cart.items.length} {cart.items.length === 1 ? 'ítem' : 'ítems'}</span>
-			{:else}
-				<span class="text-neutral-500">Mostrador</span>
-			{/if}
-		</div>
+	<CounterHeader
+		itemsCount={cart.items.length}
+		isCameraActive={counter.isCameraActive}
+		hasItems={!cart.isEmpty}
+		onToggleCamera={() => counter.toggleCamera()}
+		onOpenClearConfirm={() => counter.openClearConfirm()}
+	/>
 
-		<div class="flex items-center gap-2">
-			<!-- Camera toggle button -->
-			<button
-				type="button"
-				onclick={() => (isCameraActive = !isCameraActive)}
-				class="p-2 rounded-xl transition border {isCameraActive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-neutral-800 border-neutral-700 text-neutral-400'}"
-				aria-label={isCameraActive ? 'Apagar cámara' : 'Encender cámara'}
-			>
-				{#if isCameraActive}
-					<Camera class="w-4 h-4" />
-				{:else}
-					<CameraOff class="w-4 h-4" />
-				{/if}
-			</button>
+	<CounterNotification notification={counter.notification} />
 
-			<!-- Clear cart button -->
-			{#if !cart.isEmpty}
-				<button
-					type="button"
-					onclick={() => (isClearConfirmOpen = true)}
-					class="p-2 rounded-xl bg-neutral-800 hover:bg-rose-950/40 hover:text-rose-400 border border-neutral-700 hover:border-rose-800/40 text-neutral-400 transition"
-					aria-label="Vaciar carrito"
-				>
-					<Trash2 class="w-4 h-4" />
-				</button>
-			{/if}
-		</div>
-	</header>
-
-	<!-- Notification Toast Banner -->
-	{#if notification}
-		<div class="fixed top-14 inset-x-4 max-w-sm mx-auto z-50 pointer-events-none transition-all duration-300">
-			<div class="px-4 py-2.5 rounded-2xl shadow-xl backdrop-blur-md flex items-center gap-2 text-xs font-bold border {notification.type === 'error' ? 'bg-rose-950/90 text-rose-200 border-rose-700' : notification.type === 'success' ? 'bg-emerald-950/90 text-emerald-200 border-emerald-700' : 'bg-neutral-900/90 text-neutral-200 border-neutral-700'}">
-				{#if notification.type === 'error'}
-					<AlertCircle class="w-4 h-4 text-rose-400 shrink-0" />
-				{:else if notification.type === 'success'}
-					<CheckCircle class="w-4 h-4 text-emerald-400 shrink-0" />
-				{:else}
-					<Volume2 class="w-4 h-4 text-neutral-400 shrink-0" />
-				{/if}
-				<span class="flex-1 truncate">{notification.message}</span>
-			</div>
-		</div>
+	{#if counter.isCameraActive}
+		<CounterCamera
+			isActive={counter.isCameraActive}
+			isCollapsed={counter.isCameraCollapsed}
+			onToggleCollapse={() => counter.toggleCameraCollapse()}
+			onScan={(barcode) => counter.handleScan(barcode, products)}
+		/>
 	{/if}
 
-	<!-- Camera Viewfinder Section -->
-	{#if isCameraActive}
-		<div class="p-3 bg-neutral-900 border-b border-neutral-800/80 transition-all duration-300">
-			<div class="flex items-center justify-between mb-2 px-1">
-				<div class="flex items-center gap-2 text-xs font-semibold text-neutral-400">
-					<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-					<span>Lector de Cámara</span>
-				</div>
-				<button
-					type="button"
-					onclick={() => (isCameraCollapsed = !isCameraCollapsed)}
-					class="text-xs font-semibold text-neutral-400 hover:text-neutral-200 flex items-center gap-1 transition"
-				>
-					<span>{isCameraCollapsed ? 'Expandir' : 'Minimizar'}</span>
-					{#if isCameraCollapsed}
-						<ChevronDown class="w-3.5 h-3.5" />
-					{:else}
-						<ChevronUp class="w-3.5 h-3.5" />
-					{/if}
-				</button>
-			</div>
-
-			{#if !isCameraCollapsed}
-				<CameraScanner
-					active={isCameraActive}
-					onscan={handleBarcodeScan}
-				/>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- Main Body: Cart Items List -->
 	<main class="flex-1 overflow-y-auto p-3 space-y-2.5 pb-32">
 		{#if cart.isEmpty}
-			<!-- Empty Cart State -->
-			<div class="py-16 px-4 text-center space-y-4">
-				<div class="w-16 h-16 rounded-3xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto text-neutral-600">
-					<ShoppingBag class="w-8 h-8" />
-				</div>
-				<div>
-					<h2 class="text-base font-bold text-neutral-300">Carrito Vacío</h2>
-					<p class="text-xs text-neutral-500 max-w-xs mx-auto mt-1">
-						Apuntá la cámara a un código de barras o buscá un producto para comenzar el cobro.
-					</p>
-				</div>
-
-				<div class="flex items-center justify-center gap-2 pt-2">
-					<button
-						type="button"
-						onclick={() => (isSearchOpen = true)}
-						class="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-xs font-bold text-neutral-200 rounded-xl transition border border-neutral-700 flex items-center gap-2"
-					>
-						<Search class="w-4 h-4 text-emerald-400" />
-						<span>Buscar Producto</span>
-					</button>
-
-					{#if !isCameraActive}
-						<button
-							type="button"
-							onclick={() => (isCameraActive = true)}
-							class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-xs font-bold text-white rounded-xl transition shadow-md flex items-center gap-2"
-						>
-							<Camera class="w-4 h-4" />
-							<span>Activar Cámara</span>
-						</button>
-					{/if}
-				</div>
-			</div>
+			<CartEmptyState
+				isCameraActive={counter.isCameraActive}
+				onOpenSearch={() => counter.openSearch()}
+				onActivateCamera={() => counter.activateCamera()}
+			/>
 		{:else}
-			<!-- Items Count & Cart Header -->
-			<div class="flex items-center justify-between px-1 text-xs font-semibold text-neutral-400">
-				<span>{cart.items.length} {cart.items.length === 1 ? 'ítem' : 'ítems'} ({cart.totalUnits} {cart.totalUnits === 1 ? 'unidad' : 'unidades'})</span>
-				<span class="text-emerald-400 font-bold">Subtotal: {formatARS(cart.totalAmount)}</span>
-			</div>
-
-			<!-- Cart Item Cards -->
-			{#each cart.items as item (item.id)}
-				<div class="p-3 bg-neutral-900 rounded-2xl border border-neutral-800 shadow-sm space-y-2.5">
-					<div class="flex items-start justify-between gap-2">
-						<div class="min-w-0 flex-1">
-							<div class="font-bold text-sm text-white truncate">
-								{item.product.name}
-							</div>
-							<div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-								{#if item.isBulk}
-									<span class="inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
-										<Scale class="w-3 h-3 text-amber-400" />
-										PLU {item.product.plu_code || '-'}
-									</span>
-									<span class="text-xs text-neutral-400">
-										{formatARS(item.unitPrice)} / {item.product.bulk_reference_grams || 100}g
-									</span>
-								{:else}
-									<span class="inline-flex items-center gap-1 text-2xs font-medium px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400 border border-neutral-700">
-										<Package class="w-3 h-3 text-neutral-500" />
-										{item.product.sku}
-									</span>
-									<span class="text-xs text-neutral-400">
-										{formatARS(item.unitPrice)} c/u
-									</span>
-								{/if}
-							</div>
-						</div>
-
-						<!-- Line Total & Delete -->
-						<div class="text-right shrink-0 flex items-center gap-2">
-							<span class="text-base font-black text-emerald-400">
-								{formatARS(item.lineTotal)}
-							</span>
-							<button
-								type="button"
-								onclick={() => cart.removeItem(item.id)}
-								class="w-8 h-8 rounded-xl bg-neutral-800 hover:bg-rose-950/60 hover:text-rose-400 border border-neutral-700/80 hover:border-rose-800/60 text-neutral-400 flex items-center justify-center transition active:scale-95"
-								aria-label="Eliminar ítem"
-							>
-								<Trash2 class="w-4 h-4" />
-							</button>
-						</div>
-					</div>
-
-					<!-- Quantity or Weight Stepper Controls (Ergonomic: Subtotal on Left, Stepper on Right) -->
-					<div class="pt-2 border-t border-neutral-800/80 flex items-center justify-between">
-						<span class="text-xs font-semibold text-neutral-400">
-							Subtotal: <span class="text-white font-bold">{formatARS(item.lineTotal)}</span>
-						</span>
-
-						{#if item.isBulk}
-							<!-- Bulk Weight Modifier Button -->
-							<button
-								type="button"
-								onclick={() => handleEditItemWeight(item)}
-								class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-xs font-bold text-amber-300 rounded-xl border border-neutral-700 transition flex items-center gap-1.5"
-							>
-								<Scale class="w-3.5 h-3.5 text-amber-400" />
-								<span>{formatWeight(item.weightGrams || 0)}</span>
-								<span class="text-2xs text-neutral-400 font-normal">(Modificar)</span>
-							</button>
-						{:else}
-							<!-- Discrete Unit Stepper on the RIGHT side -->
-							<div class="flex items-center gap-1 bg-neutral-800 rounded-xl p-0.5 border border-neutral-700">
-								<button
-									type="button"
-									onclick={() => cart.updateQuantity(item.id, -1)}
-									class="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition active:scale-90"
-									aria-label="Disminuir cantidad"
-								>
-									<Minus class="w-3.5 h-3.5" />
-								</button>
-
-								<span class="w-9 text-center text-sm font-extrabold text-white">
-									{item.quantity}
-								</span>
-
-								<button
-									type="button"
-									onclick={() => cart.updateQuantity(item.id, 1)}
-									class="w-8 h-8 rounded-lg bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition active:scale-90"
-									aria-label="Aumentar cantidad"
-								>
-									<Plus class="w-3.5 h-3.5" />
-								</button>
-							</div>
-						{/if}
-					</div>
-				</div>
-			{/each}
+			<CartItemList
+				items={cart.items}
+				totalUnits={cart.totalUnits}
+				totalAmount={cart.totalAmount}
+				onEditWeight={(item) => counter.handleEditItemWeight(item)}
+				onUpdateQuantity={(id, delta) => cart.updateQuantity(id, delta)}
+				onRemove={(id) => cart.removeItem(id)}
+			/>
 		{/if}
 	</main>
 
-	<!-- Fixed Bottom Action Bar -->
-	<footer class="fixed bottom-0 inset-x-0 max-w-md mx-auto p-3 bg-neutral-900/95 backdrop-blur-xl border-t border-neutral-800 z-40">
-		<div class="flex items-center gap-2">
-			<!-- Quick Search Catalog Button -->
-			<button
-				type="button"
-				onclick={() => (isSearchOpen = true)}
-				class="h-14 px-4 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-200 font-bold rounded-2xl border border-neutral-700 transition flex flex-col items-center justify-center gap-0.5 shrink-0"
-			>
-				<Search class="w-5 h-5 text-emerald-400" />
-				<span class="text-2xs">Buscar</span>
-			</button>
-
-			<!-- Primary Checkout Button -->
-			<button
-				type="button"
-				onclick={() => (isCheckoutOpen = true)}
-				disabled={cart.isEmpty}
-				class="flex-1 h-14 bg-emerald-600 hover:bg-emerald-500 disabled:bg-neutral-800 disabled:text-neutral-500 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/25 disabled:shadow-none transition active:scale-[0.98] flex items-center justify-between px-5 cursor-pointer disabled:cursor-not-allowed"
-			>
-				<div class="text-left">
-					<div class="text-2xs uppercase font-bold tracking-wider opacity-80 leading-none">
-						{cart.totalUnits} {cart.totalUnits === 1 ? 'artículo' : 'artículos'}
-					</div>
-					<div class="text-sm font-extrabold leading-tight mt-0.5">
-						Cobrar
-					</div>
-				</div>
-
-				<div class="text-xl font-black tracking-tight text-white">
-					{formatARS(cart.totalAmount)}
-				</div>
-			</button>
-		</div>
-	</footer>
-
-	<!-- Modals -->
-	<ProductSearchModal
-		bind:open={isSearchOpen}
-		onselect={handleProductSelect}
-		onclose={() => (isSearchOpen = false)}
+	<CounterFooter
+		isEmpty={cart.isEmpty}
+		totalUnits={cart.totalUnits}
+		totalAmount={cart.totalAmount}
+		onOpenSearch={() => counter.openSearch()}
+		onOpenCheckout={() => counter.openCheckout()}
 	/>
 
-	{#if isWeightModalOpen}
+	<ProductSearchModal
+		bind:open={counter.isSearchOpen}
+		onselect={(prod) => counter.handleProductSelect(prod)}
+		onclose={() => counter.closeSearch()}
+	/>
+
+	{#if counter.isWeightModalOpen}
 		<ManualWeightModal
-			bind:open={isWeightModalOpen}
-			product={activeWeightProduct}
-			initialWeight={initialWeightGrams}
-			onconfirm={handleWeightConfirm}
-			oncancel={() => {
-				isWeightModalOpen = false;
-				activeWeightProduct = null;
-				activeWeightItemId = null;
-			}}
+			bind:open={counter.isWeightModalOpen}
+			product={counter.activeWeightProduct}
+			initialWeight={counter.initialWeightGrams}
+			onconfirm={(weight) => counter.handleWeightConfirm(weight)}
+			oncancel={() => counter.closeWeightModal()}
 		/>
 	{/if}
 
-	{#if isCheckoutOpen}
+	{#if counter.isCheckoutOpen}
 		<CheckoutModal
-			bind:open={isCheckoutOpen}
-			oncomplete={handleCheckoutSuccess}
-			oncancel={() => (isCheckoutOpen = false)}
+			bind:open={counter.isCheckoutOpen}
+			oncomplete={() => counter.handleCheckoutSuccess()}
+			oncancel={() => counter.closeCheckout()}
 		/>
 	{/if}
 
-	<!-- Clear Cart Confirmation Dialog -->
-	<Dialog
-		bind:open={isClearConfirmOpen}
-		title="¿Vaciar el carrito?"
-		description="Se eliminarán todos los artículos actuales del carrito."
-		position="center"
-		class="max-w-xs"
-	>
-		<div class="py-2 text-center space-y-3">
-			<div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto">
-				<Trash2 class="w-6 h-6" />
-			</div>
-		</div>
-		{#snippet footer()}
-			<Button
-				variant="outline"
-				size="sm"
-				onclick={() => (isClearConfirmOpen = false)}
-				class="flex-1"
-			>
-				Cancelar
-			</Button>
-			<Button
-				variant="destructive"
-				size="sm"
-				onclick={handleClearCart}
-				class="flex-1"
-			>
-				Vaciar
-			</Button>
-		{/snippet}
-	</Dialog>
+	<ClearCartModal
+		bind:open={counter.isClearConfirmOpen}
+		onConfirm={() => counter.handleClearCart()}
+		onCancel={() => counter.closeClearConfirm()}
+	/>
 </div>
