@@ -181,7 +181,9 @@ No single Python file under `server/` may exceed **250 lines of code**. When a f
     async with session.begin():
         stock = (
             await session.exec(
-                select(StockItem).where(StockItem.product_id == product_id).with_for_update()
+                select(StockItem)
+                .where(StockItem.product_id == product_id)
+                .with_for_update()
             )
         ).one_or_none()
 

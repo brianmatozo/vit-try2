@@ -166,9 +166,7 @@ A complete audit of `inventory.py` and `tests/test_inventory_engine.py` reveals:
    class InsufficientStockError(VitalcerException):
        """Raised when physical stock is insufficient (maps to HTTP 400)."""
 
-       def __init__(
-           self, item_name: str, requested: int | float, available: int | float
-       ):
+       def __init__(self, item_name: str, requested: int | float, available: int | float):
            super().__init__(
                f"Physical stock depleted for '{item_name}': "
                f"requested {requested}, available {available}"
