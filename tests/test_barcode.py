@@ -1,4 +1,4 @@
-from server.utils.barcode import parse_barcode
+from server.modules.catalog.barcode import parse_barcode
 
 
 class TestBarcodeParser:

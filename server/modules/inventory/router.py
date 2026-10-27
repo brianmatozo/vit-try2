@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.core.dependencies import get_async_db
+from server.modules.catalog.schemas import ProductResponse
 from server.modules.inventory import movements, pos_fulfillment, queries
 from server.modules.inventory.models import InventoryMovementType
 from server.modules.inventory.schemas import (
@@ -18,7 +19,6 @@ from server.modules.inventory.schemas import (
     StockReleaseRequest,
     StockReservationRequest,
 )
-from server.schemas.products import ProductResponse
 
 router = APIRouter(prefix="/inventory", tags=["Inventory Engine"])
 

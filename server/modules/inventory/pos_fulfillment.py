@@ -11,7 +11,7 @@ from server.core.exceptions import (
     InsufficientStockError,
     InsufficientVirtualStockError,
 )
-from server.models.products import Product
+from server.modules.catalog.models import Product
 from server.modules.inventory.models import InventoryLedger, InventoryMovementType
 from server.modules.inventory.movements import get_locked_product
 from server.modules.inventory.schemas import (

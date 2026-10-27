@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import event
 from sqlmodel import Session, col, select
 
-from server.models.products import Product, ProductType
+from server.modules.catalog.models import Product, ProductType
 from server.modules.inventory.models import InventoryLedger, InventoryMovementType
 
 

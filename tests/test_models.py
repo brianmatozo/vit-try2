@@ -2,9 +2,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from server.models.inventory_ledger import InventoryLedger, InventoryMovementType
-from server.models.products import Product, ProductType
-from server.models.users import User
+from server.modules.catalog.models import Product, ProductType
+from server.modules.identity.models import User
+from server.modules.inventory.models import InventoryLedger, InventoryMovementType
 
 
 class TestUserModel:

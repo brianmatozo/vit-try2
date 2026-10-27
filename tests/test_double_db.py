@@ -3,8 +3,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
 from server.core.db import get_async_database_url
-from server.models.products import Product
-from server.models.users import User
+from server.modules.catalog.models import Product
+from server.modules.identity.models import User
 
 
 class TestDatabaseURLTranslation:

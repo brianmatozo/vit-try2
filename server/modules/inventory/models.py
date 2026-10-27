@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from server.models.products import Product
+    from server.modules.catalog.models import Product
 
 
 class InventoryMovementType(str, Enum):

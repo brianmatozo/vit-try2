@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
-from server.models.products import ProductType
+from server.modules.catalog.models import ProductType
 from server.modules.inventory.models import InventoryMovementType
 
 

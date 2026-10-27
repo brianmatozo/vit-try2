@@ -3,8 +3,8 @@ from collections.abc import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from server.models.users import User
-from server.schemas.users import UserCreate
+from server.modules.identity.models import User
+from server.modules.identity.schemas import UserCreate
 
 
 async def get_users(db: AsyncSession) -> Sequence[User]:

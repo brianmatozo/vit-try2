@@ -5,7 +5,7 @@ from sqlalchemy.orm import noload
 from sqlmodel import select
 
 from server.core.exceptions import EntityNotFoundError, InvalidMovementError
-from server.models.products import Product
+from server.modules.catalog.models import Product
 from server.modules.inventory.models import InventoryLedger, InventoryMovementType
 from server.modules.inventory.schemas import (
     ShrinkageMermaRequest,

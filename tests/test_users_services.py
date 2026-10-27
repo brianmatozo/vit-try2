@@ -2,9 +2,14 @@ import pydantic
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.models.users import User
-from server.schemas.users import UserCreate
-from server.services.users_services import create_user, delete_user, get_user, get_users
+from server.modules.identity.models import User
+from server.modules.identity.schemas import UserCreate
+from server.modules.identity.service import (
+    create_user,
+    delete_user,
+    get_user,
+    get_users,
+)
 
 pytestmark = pytest.mark.anyio
 

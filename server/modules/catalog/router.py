@@ -7,14 +7,14 @@ from sqlalchemy.orm import noload
 from sqlmodel import select
 
 from server.core.dependencies import get_async_db
-from server.models.products import Product
-from server.schemas.products import (
+from server.modules.catalog.barcode import parse_barcode
+from server.modules.catalog.models import Product
+from server.modules.catalog.schemas import (
     ProductCreate,
     ProductResponse,
     ProductScanResult,
     ProductUpdate,
 )
-from server.utils.barcode import parse_barcode
 
 # Custom domain router for scanner and PLU lookups
 custom_router = APIRouter(prefix="/products", tags=["Products"])

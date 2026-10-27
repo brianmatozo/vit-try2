@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import computed_field
 from sqlmodel import Field, SQLModel
 
-from server.models.products import ProductType
+from server.modules.catalog.models import ProductType
 
 
 class ProductBase(SQLModel):

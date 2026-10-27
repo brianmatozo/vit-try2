@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from server.models.inventory_ledger import InventoryLedger
+    from server.modules.inventory.models import InventoryLedger
 
 
 class ProductType(str, Enum):
