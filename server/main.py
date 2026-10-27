@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-import server.models  # noqa: F401
+import server.core.models_registry  # noqa: F401
 from server.api.v1.router import router as v1_router
 from server.core.db import Base, async_engine
 from server.core.exceptions import register_exception_handlers

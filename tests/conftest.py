@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 from sqlmodel import Session
 
-import server.models  # noqa: F401
+import server.core.models_registry  # noqa: F401
 from server.core.db import Base
 from server.core.dependencies import get_async_db, get_db
 from server.main import app
