@@ -1,8 +1,11 @@
 # Remito Ingestion & Automated Stock Inbound Service — Technical Specification
 
-> **Version**: 1.0 · **Status**: Draft · **Last Updated**: 2026-10-09
+> **Version**: 1.1 · **Status**: Revised Draft (Modular 250 LOC & Phase 6 Governance Compliant) · **Last Updated**: 2026-10-27
 >
-> **Parent Specification**: [`SPECIFICATION.md`](../SPECIFICATION.md) (Vitalcer System Architecture)
+> **Parent Specification**: [`SPECIFICATION.md`](../SPECIFICATION.md) (Vitalcer System Architecture)  
+> **Governing Architecture & Refactoring Standards**:  
+> - [`AGENTS.md`](../AGENTS.md) (Section 1.2: Zero Unconfirmed Paid API Calls; Section 6: Backend Architecture & Async SQLModel Contract; Section 6.B: The 250 LOC Backend Blueprint; Section 6.C: Async MVCC & Double-Entry Invariants; Section 6.E: Whole ARS Integer Currency)  
+> - [`docs/backend_refactoring_plan.md`](backend_refactoring_plan.md) (Phase 6: Auxiliary Script Governance & Phase 3B Alignment)  
 >
 > **Scope**: End-to-end pipeline for ingesting physical Argentine delivery receipts (*Recibo X* / *Remitos*) via AI Vision, resolving wholesale packaging to internal single-unit SKUs, computing real net unit costs with Argentine fiscal splits, and committing audited stock through the existing double-entry inventory ledger.
 
@@ -11,6 +14,13 @@
 ## Table of Contents
 
 1. [System Architecture & High-Level Flow](#1-system-architecture--high-level-flow)
+   - [1.1 Problem Statement](#11-problem-statement)
+   - [1.2 Solution Overview](#12-solution-overview)
+   - [1.3 End-to-End Architecture Diagram](#13-end-to-end-architecture-diagram)
+   - [1.4 Remito Lifecycle State Machine](#14-remito-lifecycle-state-machine)
+   - [1.5 Vertical Domain Slice Architecture (`server/modules/remitos/`)](#15-vertical-domain-slice-architecture-servermodulesremitos)
+   - [1.6 The 250 LOC Backend Blueprint & Domain Invariants](#16-the-250-loc-backend-blueprint--domain-invariants)
+   - [1.7 Auxiliary Script Governance & Spike Decomposition (`spike_remito_vision.py`)](#17-auxiliary-script-governance--spike-decomposition-spike_remito_visionpy)
 2. [Data Models & Database Schema](#2-data-models--database-schema)
 3. [OpenRouter Vision Pipeline](#3-openrouter-vision-pipeline)
 4. [Catalog Matching & Conversion Engine](#4-catalog-matching--conversion-engine)
@@ -153,19 +163,74 @@ Replace manual data entry with a **photo-first mobile ingestion workflow**:
 | `COMMITTED` | Stock committed, ledger entries created, alias cache updated | Terminal |
 | `REJECTED` | Clerk discarded this remito (duplicate, unreadable, etc.) | Terminal |
 
-### 1.5 Component Responsibilities
+### 1.5 Vertical Domain Slice Architecture (`server/modules/remitos/`)
 
-| Component | Module Path | Responsibility |
-| :--- | :--- | :--- |
-| **Image Preprocessor** | `server/services/remito/image_preprocessor.py` | EXIF rotation fix, resize, base64 encoding, multi-page ordering |
-| **Vision Extraction Client** | `server/services/remito/vision_client.py` | OpenRouter async client, structured prompt, Pydantic output parsing |
-| **Packaging Parser** | `server/services/remito/packaging_parser.py` | Regex multiplier extraction, package type classification, unit normalization |
-| **Catalog Matcher** | `server/services/remito/catalog_matcher.py` | 3-tier product resolution (alias → fuzzy → LLM) |
-| **Fiscal Calculator** | `server/services/remito/fiscal_calculator.py` | Blanco/negro split, IVA, real net unit cost computation |
-| **Remito Service** | `server/services/remito/remito_service.py` | Orchestrator: scan-and-stage, confirm, reject lifecycle |
-| **API Endpoints** | `server/api/v1/endpoints/remitos.py` | REST endpoints for remito CRUD, scan, confirm |
-| **SQLModel Models** | `server/models/remito.py` | `Remito`, `RemitoItem`, `SupplierProductMapping` table definitions |
-| **Pydantic Schemas** | `server/schemas/remito.py` | Request/response validation, Vision output schemas |
+In compliance with [`AGENTS.md`](../AGENTS.md) Section 6.A and [`docs/backend_refactoring_plan.md`](backend_refactoring_plan.md) Phase 6, the Remito Ingestion service is implemented as a dedicated vertical domain slice under `server/modules/remitos/`. All legacy horizontal structures (`server/services/remito/`, `server/models/remito.py`, `server/schemas/remito.py`, `server/api/v1/endpoints/remitos.py`) are strictly prohibited.
+
+```text
+server/modules/remitos/
+├── __init__.py           # Package exports & public API (< 15 LOC)
+├── models.py             # SQLModel tables: Remito, RemitoItem, SupplierProductMapping (< 140 LOC)
+├── schemas.py            # Pydantic extraction schemas and request/response DTOs (< 100 LOC)
+├── client.py             # OpenRouter Vision client & image preprocessor (< 120 LOC)
+├── converter.py          # Packaging parser & conversion multiplier detection (< 90 LOC)
+├── fiscal.py             # 60/40 fiscal split calculator (blanco/negro + 21% IVA) (< 80 LOC)
+├── matching.py           # 3-tier catalog resolution engine (alias → fuzzy → LLM) (< 120 LOC)
+├── service.py            # Lifecycle orchestration, atomic receiving commit, alias caching (< 140 LOC)
+└── router.py             # Thin HTTP coordinator mounted at /api/v1/remitos (< 130 LOC)
+```
+
+| Component | Module Path | LOC Ceiling | Responsibility |
+| :--- | :--- | :--- | :--- |
+| **Package Exports** | `server/modules/remitos/__init__.py` | < 15 LOC | Module exports (`router`, `Remito`, `RemitoItem`, etc.) |
+| **SQLModel Models** | `server/modules/remitos/models.py` | < 140 LOC | `Remito`, `RemitoItem`, `SupplierProductMapping` table definitions |
+| **Pydantic Schemas** | `server/modules/remitos/schemas.py` | < 100 LOC | Vision extraction schemas and API request/response DTOs |
+| **Vision Client & Preprocessor** | `server/modules/remitos/client.py` | < 120 LOC | OpenRouter async client, EXIF orientation fix, WebP downscaling, system prompt |
+| **Packaging Converter** | `server/modules/remitos/converter.py` | < 90 LOC | Regex multiplier extraction, packaging classification, unit normalization |
+| **Fiscal Calculator** | `server/modules/remitos/fiscal.py` | < 80 LOC | 60/40 fiscal split arithmetic, IVA on blanco, integer ARS unit cost math |
+| **Catalog Matcher** | `server/modules/remitos/matching.py` | < 120 LOC | 3-tier product resolution (Tier 1 alias → Tier 2 trigram → Tier 3 LLM) |
+| **Remito Service Engine** | `server/modules/remitos/service.py` | < 140 LOC | Inbound receiving orchestrator, double-entry stock commit, alias cache upsert |
+| **API Router** | `server/modules/remitos/router.py` | < 130 LOC | Thin HTTP coordinator delegating to `service.py`, global exception integration |
+
+### 1.6 The 250 LOC Backend Blueprint & Domain Invariants
+
+Per [`AGENTS.md`](../AGENTS.md) Section 6.B and Section 6.C, the remito domain enforces strict architectural invariants:
+
+1. **Strict 250 LOC Ceiling**: No single Python file under `server/modules/remitos/` may exceed 250 LOC. The modular structure targets a post-refactor profile of **< 140 LOC** per file, leaving ample headroom for future business requirements.
+2. **Thin HTTP Routers**: `router.py` performs zero business logic, raw SQL queries, or manual try/except blocks. It handles HTTP parameter validation, calls `service.py`, and returns Pydantic response models.
+3. **Decoupled Cross-Slice Relationships**: Models never import tables directly from `server/modules/catalog/models.py`. Foreign keys use table string names (e.g., `foreign_key="products.id"`). Relationships use string forward references with `if TYPE_CHECKING:` guards. All models are registered centrally in `server/core/models_registry.py`.
+4. **Explicit Aggregate Routing**: The router is explicitly mounted in `server/api/v1/router.py`:
+   ```python
+   from server.modules.remitos.router import router as remitos_router
+   v1_router.include_router(remitos_router)
+   ```
+5. **Centralized Domain Exceptions**: Endpoints eliminate repetitive `try...except` blocks, throwing typed domain exceptions (`EntityNotFoundError`, `InvalidMovementError`, `VitalcerException`) registered in `server/core/exceptions.py`. Custom handlers strictly emit `{"detail": exc.message}` to preserve OpenAPI and frontend toast contract consistency.
+6. **Append-Only Double-Entry Receiving**: Stock commits never overwrite balances directly. On confirmation, `service.py` executes an atomic transaction locking each product via `select(Product).options(noload("*")).where(Product.id == pid).with_for_update()` and appending an immutable `InventoryLedger` entry with `movement_type = "receiving"`.
+7. **Whole ARS Integer Currency**: All extracted wholesale costs, calculated landed pack costs, unit prices, and IVA figures are strictly stored and computed as whole Argentine Pesos (`int`), using integer arithmetic or explicit banker's rounding (`round()`).
+
+### 1.7 Auxiliary Script Governance & Spike Decomposition (`spike_remito_vision.py`)
+
+During initial research and Phase 3B prototyping, an exploratory spike script [`scripts/spike_remito_vision.py`](file:///home/brian/dev/scripts/spike_remito_vision.py) (906 LOC) was authored to evaluate Gemini 2.0 Flash vision extraction against physical Argentine remito photos.
+
+#### Auxiliary Script Governance Policy
+In accordance with [`docs/backend_refactoring_plan.md`](backend_refactoring_plan.md) Phase 6:
+* **Standalone Classification**: `scripts/spike_remito_vision.py` is explicitly tagged with an architecture header as an auxiliary research prototype.
+* **Zero Runtime Server Import**: This script is strictly forbidden from being imported by or executed within `server/`. It operates solely as a developer CLI tool.
+* **Zero Autonomous Paid API Calls**: In accordance with [`AGENTS.md`](../AGENTS.md) Section 1.2, AI agents and automated CI test runners must **never** execute live billable API calls using user credentials. All test suites and automated benchmarks must run against `--mock` mode or offline JSON fixtures stored in `tests/fixtures/remitos/`.
+
+#### Productionization Decomposition Matrix
+The 906 LOC monolithic spike is systematically decomposed into the vertical domain slice `server/modules/remitos/`:
+
+| Spike Source Range (`spike_remito_vision.py`) | Target Modular Component | Target LOC | Responsibilities Migrated |
+| :--- | :--- | :--- | :--- |
+| **Lines 1–120** | `scripts/spike_remito_vision.py` | Retained (CLI) | Standalone developer CLI, Argparse runner, Rich terminal rendering |
+| **Lines 121–220** | `server/modules/remitos/schemas.py` | < 100 LOC | `ExtractedLineItem`, `ExtractedFiscalInfo`, `RemitoVisionOutput`, API DTOs |
+| **Lines 221–350** | `server/modules/remitos/client.py` | < 120 LOC | PIL image preprocessing: EXIF transposition, WebP conversion, resize to ≤2048px |
+| **Lines 351–500** | `server/modules/remitos/client.py` | < 120 LOC | OpenRouter async client, system prompt, Gemini 2.0 Flash call & Sonnet retry |
+| **Lines 501–650** | `server/modules/remitos/converter.py` | < 90 LOC | Regex packaging multiplier detection (`x 10 u`, `pack de 6`, `kg`, etc.) |
+| **Lines 651–750** | `server/modules/remitos/fiscal.py` | < 80 LOC | 60/40 fiscal split, basis points calculations (6000 bps / 4000 bps / 2100 bps) |
+| **Lines 751–850** | `server/modules/remitos/matching.py` | < 120 LOC | Supplier text normalization, Tier 1 alias lookup, Tier 2 trigram, Tier 3 LLM |
+| **Lines 851–906** | `server/modules/remitos/service.py` & `models.py` | < 140 LOC each | Database persistence, staged state management, atomic stock receiving commit |
 
 ---
 
@@ -182,7 +247,7 @@ All new tables follow Vitalcer's existing conventions:
 Stores the header-level data for each ingested delivery receipt.
 
 ```python
-# server/models/remito.py
+# server/modules/remitos/models.py
 
 from datetime import datetime, timezone
 from enum import Enum
@@ -191,7 +256,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
-    from server.models.remito import RemitoItem
+    from server.modules.remitos.models import RemitoItem
 
 
 class RemitoStatus(str, Enum):
@@ -500,10 +565,10 @@ def normalize_supplier_text(raw: str) -> str:
 
 ### 2.4 `Product` Model Extension
 
-A single new nullable column is added to the existing `Product` model:
+A single new nullable column is added to the existing `Product` model in the catalog slice:
 
 ```python
-# server/models/products.py — addition
+# server/modules/catalog/models.py — addition
 
     # Cost tracking (updated on remito commit)
     last_cost: int | None = Field(
@@ -515,7 +580,21 @@ A single new nullable column is added to the existing `Product` model:
 
 This records the most recent real landed cost per discrete unit (or per `bulk_reference_grams` for bulk products), enabling future margin analysis and pricing decisions. Stored in **whole ARS** per the system-wide currency invariant.
 
-### 2.5 PostgreSQL DDL Summary
+### 2.5 Central Registry Registration (`models_registry.py`)
+
+To prevent circular imports and guarantee that all SQLModel metadata and mapper relationships resolve in deterministic order across slices:
+
+```python
+# server/core/models_registry.py — addition
+import server.modules.catalog.models  # noqa: F401
+import server.modules.identity.models  # noqa: F401
+import server.modules.inventory.models  # noqa: F401
+import server.modules.remitos.models  # noqa: F401
+```
+
+Foreign keys between slices use string references (`foreign_key="products.id"`). Relationships use forward string references (`"Product"`, `"RemitoItem"`) guarded by `if TYPE_CHECKING:` blocks, preserving complete cross-slice decoupling.
+
+### 2.6 PostgreSQL DDL Summary
 
 ```sql
 -- Remitos header table
@@ -587,7 +666,7 @@ CREATE INDEX ix_spm_product ON supplier_product_mappings(product_id);
 ALTER TABLE products ADD COLUMN last_cost INTEGER;
 ```
 
-### 2.6 Entity Relationship Diagram
+### 2.7 Entity Relationship Diagram
 
 ```
 ┌──────────┐       ┌──────────────┐       ┌──────────┐
@@ -644,10 +723,12 @@ ALTER TABLE products ADD COLUMN last_cost INTEGER;
 
 **Decision**: Gemini 2.0 Flash handles ~95% of delivery notes. Automatic fallback to Sonnet when the Gemini response has a `"low_confidence": true` flag or fails structured output validation.
 
-### 3.2 API Integration Blueprint
+### 3.2 API Integration Blueprint (`server/modules/remitos/client.py` — < 120 LOC)
+
+The Vision client consolidates both image preprocessing (EXIF transposition, WebP downscaling) and OpenRouter async requests within a single cohesive module under **120 LOC**:
 
 ```python
-# server/services/remito/vision_client.py
+# server/modules/remitos/client.py
 
 from openai import AsyncOpenAI
 from server.core.config import settings
@@ -666,10 +747,13 @@ PRIMARY_MODEL = "google/gemini-2.0-flash-001"
 FALLBACK_MODEL = "anthropic/claude-3.5-sonnet"
 ```
 
+> [!IMPORTANT]
+> **Zero Billable API Calls Invariant**: In accordance with [`AGENTS.md`](../AGENTS.md) Section 1.2 and Section 4.8, live network calls to OpenRouter are strictly forbidden during automated unit and integration tests. Test suites inject pre-recorded JSON fixture responses (`tests/fixtures/remitos/`) or mock the OpenRouter client completion method directly.
+
 **Image Preprocessing** (before sending to OpenRouter):
 
 ```python
-# server/services/remito/image_preprocessor.py
+# server/modules/remitos/client.py — image preprocessing helper
 
 from PIL import Image, ImageOps
 import base64
@@ -735,7 +819,7 @@ Do not include any text outside the JSON object.\
 **Pydantic Output Schemas** (used for structured JSON mode):
 
 ```python
-# server/schemas/remito.py — Vision output models
+# server/modules/remitos/schemas.py — Vision output models
 
 from pydantic import BaseModel, Field
 
@@ -925,6 +1009,9 @@ async def extract_remito(
 **Tier 1: Exact Supplier Alias Lookup**
 
 ```python
+# server/modules/remitos/matching.py — Tier 1, 2 & 3 product resolution (< 120 LOC)
+
+
 async def tier1_exact_alias(
     db: AsyncSession,
     supplier_name: str,
@@ -1067,12 +1154,12 @@ async def tier3_llm_match(
 The packaging parser extracts the conversion multiplier from the raw supplier description text using a hierarchy of regex patterns tuned for Argentine wholesale formatting conventions.
 
 ```python
-# server/services/remito/packaging_parser.py
+# server/modules/remitos/converter.py — packaging parser (< 90 LOC)
 
 import re
 from dataclasses import dataclass
 
-from server.models.products import ProductType
+from server.modules.catalog.models import ProductType
 
 
 @dataclass
@@ -1257,7 +1344,7 @@ Cost per 100g = round(Real Pack Cost / Total Grams × 100)    # Integer ARS
 #### Implementation
 
 ```python
-# server/services/remito/fiscal_calculator.py
+# server/modules/remitos/fiscal.py — unit cost & fiscal split arithmetic (< 80 LOC)
 
 from dataclasses import dataclass
 
@@ -1355,7 +1442,22 @@ def compute_unit_cost(
 
 ## 5. API Contract & Endpoints
 
-All endpoints are prefixed under `/api/v1/remitos` and registered in the existing FastAPI router structure.
+All endpoints are defined in the thin HTTP coordinator `server/modules/remitos/router.py` (< 130 LOC), backed by domain service orchestration in `server/modules/remitos/service.py` (< 140 LOC), and explicitly mounted in the aggregate router `server/api/v1/router.py`:
+
+```python
+# server/api/v1/router.py
+from fastapi import APIRouter
+from server.modules.catalog.router import router as catalog_router
+from server.modules.identity.router import router as identity_router
+from server.modules.inventory.router import router as inventory_router
+from server.modules.remitos.router import router as remitos_router
+
+v1_router = APIRouter(prefix="/v1")
+v1_router.include_router(identity_router)
+v1_router.include_router(catalog_router)
+v1_router.include_router(inventory_router)
+v1_router.include_router(remitos_router)
+```
 
 ### 5.1 Endpoint Summary
 
@@ -1678,10 +1780,10 @@ async def confirm_remito(db: AsyncSession, remito_id: int) -> Remito:
     remito = (await db.scalars(stmt)).first()
 
     if not remito:
-        raise ValueError(f"Remito {remito_id} not found")
+        raise EntityNotFoundError("Remito", remito_id)
 
     if remito.status != RemitoStatus.STAGED:
-        raise ValueError(
+        raise InvalidMovementError(
             f"Remito {remito_id} is '{remito.status}', expected 'staged'. "
             f"Cannot confirm a remito that is already {remito.status}."
         )
@@ -1705,52 +1807,68 @@ The `SELECT FOR UPDATE` on the `remitos` row prevents two concurrent confirm req
 
 ## 8. Implementation Roadmap
 
-### Phase 1: Core Vision Extraction & Packaging Parser Spike (1-2 weeks)
+### Phase 1: Core Modular Extraction, Packaging Converter & Fiscal Engine (< 140 LOC / Module)
 
-**Goal**: End-to-end proof that the pipeline works with real Argentine remito photos.
+**Goal**: Extract proven algorithms from `scripts/spike_remito_vision.py` into production-ready vertical modules under `server/modules/remitos/` conforming to the 250 LOC blueprint.
 
-| Task | Deliverable |
-| :--- | :--- |
-| Set up OpenRouter client | `server/services/remito/vision_client.py` with structured output |
-| Prompt engineering | Iterative tuning with 10+ real remito photos from New Day |
-| Pydantic output schemas | `server/schemas/remito.py` — `RemitoVisionOutput` and children |
-| Image preprocessor | `server/services/remito/image_preprocessor.py` — EXIF fix, resize, base64 |
-| Packaging parser | `server/services/remito/packaging_parser.py` — regex multiplier extraction |
-| Fiscal calculator | `server/services/remito/fiscal_calculator.py` — unit cost math |
-| Unit tests | `tests/test_packaging_parser.py`, `tests/test_fiscal_calculator.py` |
-| Manual validation | Run against 5 real multi-page remitos, compare to manual data entry |
+| Task | Deliverable | Target LOC | Focus & Standards |
+| :--- | :--- | :--- | :--- |
+| Pydantic Schemas | `server/modules/remitos/schemas.py` | < 100 LOC | `ExtractedLineItem`, `ExtractedFiscalInfo`, `RemitoVisionOutput`, API DTOs |
+| Vision Client & Preprocessor | `server/modules/remitos/client.py` | < 120 LOC | OpenRouter client, EXIF auto-rotation, WebP compression, system prompt |
+| Packaging Converter | `server/modules/remitos/converter.py` | < 90 LOC | Regex packaging multiplier detection (`x 10 u`, `pack de 6`, `kg`) |
+| Fiscal Calculator | `server/modules/remitos/fiscal.py` | < 80 LOC | 60/40 fiscal split, basis points calculations (6000/4000/2100 bps), integer ARS |
+| Converter Unit Tests | `tests/remitos/test_converter.py` | < 100 LOC | Unit test suite for packaging pattern detection & bulk conversions |
+| Fiscal Math Unit Tests | `tests/remitos/test_fiscal.py` | < 100 LOC | Unit test suite for 60/40 split, IVA, and integer rounding |
+| Offline Test Fixtures | `tests/fixtures/remitos/*.json` | Fixtures | Mock LLM responses for New Day remitos (guarantees zero live paid calls) |
 
-### Phase 2: Database Schema & FastAPI Endpoints (1-2 weeks)
+### Phase 2: Database Schema, 3-Tier Matcher, Atomic Commit Engine & API Router
 
-**Goal**: Full backend API with persistence and catalog matching.
+**Goal**: Full backend API with SQLModel persistence, cross-slice decoupling, double-entry ledger commit, and thin HTTP routing.
 
-| Task | Deliverable |
-| :--- | :--- |
-| SQLModel tables | `server/models/remito.py` — `Remito`, `RemitoItem`, `SupplierProductMapping` |
-| Product extension | Add `last_cost` column to `Product` |
-| PostgreSQL pg_trgm | Migration enabling trigram extension for fuzzy matching |
-| Catalog matcher | `server/services/remito/catalog_matcher.py` — 3-tier engine |
-| Remito orchestrator | `server/services/remito/remito_service.py` — scan, stage, confirm, reject |
-| API endpoints | `server/api/v1/endpoints/remitos.py` — all 8 endpoints |
-| Pydantic request/response schemas | `server/schemas/remito.py` — API contract models |
-| Integration tests | `tests/test_remito_endpoints.py` — SQLite in-memory harness |
-| OpenAPI codegen | `make codegen` to regenerate `@vitalcer/api` client with remito types |
+| Task | Deliverable | Target LOC | Focus & Standards |
+| :--- | :--- | :--- | :--- |
+| SQLModel Models | `server/modules/remitos/models.py` | < 140 LOC | `Remito`, `RemitoItem`, `SupplierProductMapping` tables |
+| Product Extension | `server/modules/catalog/models.py` | Addition | Add `last_cost: int \| None` column |
+| Models Registry | `server/core/models_registry.py` | Addition | Register `server.modules.remitos.models` in deterministic order |
+| Catalog Matcher | `server/modules/remitos/matching.py` | < 120 LOC | 3-tier product resolution (Tier 1 alias → Tier 2 trigram → Tier 3 LLM) |
+| Remito Service Engine | `server/modules/remitos/service.py` | < 140 LOC | Scan-and-stage, double-entry commit (`_get_locked_product`), alias upsert |
+| Thin API Router | `server/modules/remitos/router.py` | < 130 LOC | HTTP coordinator delegating to `service.py`, global exception handlers |
+| Router Registration | `server/api/v1/router.py` | Addition | `v1_router.include_router(remitos_router)` |
+| Matcher Unit Tests | `tests/remitos/test_matching.py` | < 110 LOC | Test alias cache hit, trigram fuzzy matching, normalization |
+| Service & Commit Tests | `tests/remitos/test_service.py` | < 120 LOC | Test double-entry receiving commit, `last_cost` update, locking |
+| Endpoint Integration Tests | `tests/remitos/test_router.py` | < 120 LOC | Test all 8 endpoints with test client and mock vision fixtures |
+| OpenAPI Codegen | `make codegen` | Automated | Export OpenAPI spec and regenerate `@vitalcer/api` client types |
 
-### Phase 3: Backoffice Staging UI & Stock Commit Workflow (1-2 weeks)
+### Phase 3: Backoffice Staging UI & Inbound Stock Workflow
 
-**Goal**: Clerk-facing UI for review and stock commitment.
+**Goal**: Clerk-facing UI for review, side-by-side receipt audit, manual override, and atomic stock commitment.
 
-| Task | Deliverable |
-| :--- | :--- |
-| Remito list page | `apps/admin/src/routes/remitos/+page.svelte` — status tabs, listing |
-| Upload page | `apps/admin/src/routes/remitos/new/+page.svelte` — multi-image upload |
-| Staging review page | `apps/admin/src/routes/remitos/[id]/+page.svelte` — audit table, photo viewer |
-| Product picker combobox | Searchable dropdown with keyboard nav for manual overrides |
-| Fiscal split controls | Slider/input for blanco/negro/IVA with real-time recalc |
-| Quick product create modal | Inline "Crear Producto Rápido" for unmatched items |
-| Confirm/reject actions | Wired to `POST /confirm` and `POST /reject` endpoints |
-| Navigation | Add "Remitos" entry to admin sidebar/nav |
-| End-to-end testing | Full flow: upload photo → review → edit → confirm → verify stock |
+| Task | Deliverable | Focus & Standards |
+| :--- | :--- | :--- |
+| Remito List View | `apps/admin/src/routes/remitos/+page.svelte` | Staged/Committed tabs, supplier and date filters, KPI summary cards |
+| Multi-Photo Upload | `apps/admin/src/routes/remitos/new/+page.svelte` | Multi-page file dropzone, camera upload, scan progress bar |
+| Staging Review Screen | `apps/admin/src/routes/remitos/[id]/+page.svelte` | Side-by-side receipt photo pan/zoom lightbox ↔ editable data grid |
+| Product Combobox | `@vitalcer/ui` Combobox / Picker | Searchable catalog dropdown with keyboard navigation for manual overrides |
+| Fiscal Split Sliders | Component in `/remitos/[id]` | Real-time sliders for blanco/negro/IVA triggering dynamic recalculation |
+| Quick Product Modal | Inline modal in `/remitos/[id]` | Fast creation of new `Product` for 🔴 unmatched items |
+| Atomic Commit Action | Confirm Button in `/remitos/[id]` | Wired to `POST /confirm` with optimistic toast feedback |
+| Navigation Integration | Admin layout navigation | Add "Remitos" link with staging badge counter |
+
+### Phase 4: Productionization, Monorepo Verification & Spike Governance Gate
+
+**Goal**: Verify architectural compliance with [`AGENTS.md`](../AGENTS.md) and [`docs/backend_refactoring_plan.md`](backend_refactoring_plan.md).
+
+| Gate / Requirement | Verification Protocol | Success Criteria |
+| :--- | :--- | :--- |
+| **Spike Governance** | Check `scripts/spike_remito_vision.py` | Verified standalone spike header; zero imports in `server/` |
+| **Zero Paid API Calls** | Audit CI & test runners | Automated tests use offline mock fixtures only; zero live calls |
+| **250 LOC Ceiling** | Line count audit (`wc -l server/modules/remitos/*.py`) | Every file < 140 LOC (well below 250 LOC hard limit) |
+| **Modular Test Ceiling** | Line count audit (`wc -l tests/remitos/*.py`) | Every test file < 120 LOC |
+| **Lint & Style** | `make lint` | Zero errors across `ruff` and `biome` |
+| **Strict Typecheck** | `make typecheck` | Zero errors across all domain modules |
+| **Test Suite** | `make test` | 100% passing tests on SQLite in-memory harness |
+| **OpenAPI Contract** | `make openapi` | Canonical key-sorted OpenAPI spec diff is clean |
+| **Full Validation** | `make check` | Monorepo build passes without errors |
 
 ---
 

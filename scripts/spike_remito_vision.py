@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Vision Spike: Test OpenRouter vision extraction on Argentine delivery receipts.
+"""Experimental Research Spike: Delivery Receipt Vision Extraction (Phase 3B Prototype).
+
+ARCHITECTURE STATUS: STANDALONE SPIKE / RESEARCH PROTOTYPE ONLY
+Governing Standards: AGENTS.md (Section 1.2, 4.8),
+docs/backend_refactoring_plan.md (Phase 6).
+NOT RUNTIME SERVER CODE: This script is not executed by the FastAPI server,
+not imported by server runtime, and not covered by automated test suites.
+PRODUCTIONIZATION: Decomposed into server/modules/remitos/ (client.py,
+schemas.py, fiscal.py, converter.py, matching.py, service.py, router.py)
+per docs/remito_ingestion_specification.md.
+ZERO PAID LIVE CALLS: Autonomous live calls forbidden; use --mock for tests.
 
 Supports multiple models via OpenRouter (Gemini 2.0 Flash, Claude 3.5 Sonnet, etc.),
 multi-page receipt image processing, and structured Pydantic extraction.
