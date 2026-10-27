@@ -1,4 +1,5 @@
 import {
+	extractApiError,
 	type ProductResponse,
 	type ScanBarcodeResponse,
 	scanBarcode,
@@ -136,12 +137,11 @@ export async function resolveBarcodeScan(
 		}
 
 		if (res.error) {
-			const errPayload = res.error as Record<string, unknown> | undefined;
-			const msg =
-				typeof errPayload?.detail === 'string'
-					? errPayload.detail
-					: `Código no encontrado: ${clean}`;
-			return { type: 'error', message: msg };
+			const { message } = extractApiError(
+				res.error,
+				`Código no encontrado: ${clean}`,
+			);
+			return { type: 'error', message };
 		}
 	} catch (err: unknown) {
 		console.error('Scan error:', err);

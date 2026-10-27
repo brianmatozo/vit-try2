@@ -1,4 +1,4 @@
-import { recordPosBatchSale } from '@vitalcer/api';
+import { extractApiError, recordPosBatchSale } from '@vitalcer/api';
 import { playError, playSuccess } from '$lib/audio/sound';
 import type { CartItem } from '$lib/cart/cart.svelte';
 
@@ -91,14 +91,11 @@ export class CheckoutState {
 			});
 
 			if (response.error) {
-				const errPayload = response.error as
-					| Record<string, unknown>
-					| undefined;
-				const detail =
-					typeof errPayload?.detail === 'string'
-						? errPayload.detail
-						: 'Error procesando la venta';
-				throw new Error(detail);
+				const { message } = extractApiError(
+					response.error,
+					'Error procesando la venta',
+				);
+				throw new Error(message);
 			}
 
 			await playSuccess()?.catch?.(() => {});
