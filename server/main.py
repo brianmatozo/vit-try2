@@ -6,6 +6,7 @@ from fastapi import FastAPI
 import server.models  # noqa: F401
 from server.api.v1.router import router as v1_router
 from server.core.db import Base, async_engine
+from server.core.exceptions import register_exception_handlers
 
 _tags_metadata: list[dict[str, str]] = [
     {
@@ -45,4 +46,5 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+register_exception_handlers(app)
 app.include_router(v1_router, prefix="/api")
