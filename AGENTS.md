@@ -7,7 +7,7 @@ This repository is **Vitalcer**, a single-store dietetic store management system
 ## 1. Tooling & Agent Update Invariant (STRICT)
 
 > **Mandatory Rules for AI Agents**:
-> 1. **Infrastructure Ledger**: Every time you touch or modify anything related to tooling (Nix, `devenv.nix`, packages, scripts, processes, ports, Docker, dev workflow, build configuration, linters, or proxies), you **MUST** record the change in the **Tooling & Infrastructure Ledger** (Section 6) of this file (`AGENTS.md`).
+> 1. **Infrastructure Ledger**: Every time you touch or modify anything related to tooling (Nix, `devenv.nix`, packages, scripts, processes, ports, Docker, dev workflow, build configuration, linters, or proxies), you **MUST** record the change in the **Tooling & Infrastructure Ledger** (Section 8) of this file (`AGENTS.md`).
 > 2. **Zero Unconfirmed Paid/Billable API Calls**: AI agents are strictly forbidden from executing scripts, tests, or commands that make live calls to external billable APIs (e.g. OpenRouter, LLM endpoints, paid cloud services) using user credentials without explicit, unambiguous user consent in chat. Always use `--mock` mode, offline fixtures, or unit tests. Never spend user money autonomously.
 > Furthermore, this file is the **single, super-compressed technical source of truth** for project architecture, commands, directories, domain invariants, and live status. Keep it concise, high-density, and LLM-friendly.
 
@@ -57,7 +57,7 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 
 ## 3. Monorepo Structure
 
-```
+```text
 ├── server/                     # FastAPI + SQLModel modular monolith backend
 │   ├── main.py                 # FastAPI application factory & routers
 │   ├── api/v1/endpoints/       # users.py, products.py, inventory.py
@@ -100,84 +100,134 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 4. **Static SPAs**: Both frontend applications in `apps/` must remain pure static SPAs (`ssr = false`, `@sveltejs/adapter-static`) with zero Node.js server dependencies in production.
 5. **HTTPS & Camera Access**: `apps/pos` must be served over HTTPS (port `5174`) for W3C Secure Context camera permissions (`navigator.mediaDevices.getUserMedia`).
 6. **Tailwind CSS v4 & Token Architecture**:
-* App CSS entry files (`apps/*/src/routes/layout.css`) must declare `@source "../../../../packages/ui/src";`.
-* `packages/ui/src/theme.css` is the single source of truth for design tokens (`@theme`, `@utility`). Never import Tailwind directly inside it.
-* **Zero Arbitrary Brackets**: Do NOT use arbitrary bracket utilities (e.g., `text-[10px]`, `h-[40px]`). Dense POS typography and clamps must use tokens defined in `@theme` (e.g. `--text-2xs: 10px;`, `--text-3xs: 9px;`).
-
-
+   - App CSS entry files (`apps/*/src/routes/layout.css`) must declare `@source "../../../../packages/ui/src";`.
+   - `packages/ui/src/theme.css` is the single source of truth for design tokens (`@theme`, `@utility`). Never import Tailwind directly inside it.
+   - **Zero Arbitrary Brackets**: Do NOT use arbitrary bracket utilities (e.g., `text-[10px]`, `h-[40px]`). Dense POS typography and clamps must use tokens defined in `@theme` (e.g. `--text-2xs: 10px;`, `--text-3xs: 9px;`).
 7. **Mobile-First Modals**: Modals in `@vitalcer/ui` render via portal with backdrop overlay (`fixed inset-0 z-50 bg-black/60`), behave as a bottom sheet on mobile (`< sm`), and center on desktop (`sm:`). For alerts or modals that must always center on all screens, pass `position="center"` or `centered`. Dialog footer buttons render in a `justify-end` container; use `mr-auto` (not `ml-auto`) to left-align footer actions.
 8. **Zero Autonomous Paid API Calls**: AI agents must NEVER execute scripts or commands that make live requests to external paid APIs using user credentials without explicit chat consent. Always use `--mock` mode, fixtures, or local SQLite mocks.
 
 ---
 
-## 5. Workspace Boundaries & Svelte 5 Architecture Contract
+## 6. Backend Architecture & Async SQLModel Contract
 
-### A. Package & Layer Boundaries
+### A. Module Boundaries & Routing Invariant
 
-* **`@vitalcer/core` (Domain Math & Invariants)**: Framework-agnostic pure TypeScript. GS1 barcode parsing, ARS integer currency math, and weight calculation logic. Must have zero DOM/browser dependencies and run cleanly in Node/Vitest.
-* **`@vitalcer/ui` (Design System Primitives)**: Generic, unstyled/Tailwind-styled UI primitives (Bits UI wrappers: Dialog, Button, Card, Input) and design tokens (`theme.css`). Must contain **zero domain knowledge** (no products, prices, barcodes, or cart types).
-* **`@vitalcer/api` (Network & Contracts)**: OpenAPI-generated client, Zod validation schemas, and TanStack Query option factories.
-* **`apps/*/src/lib/<domain>/` (App-Specific Features)**: State machines, browser APIs (audio synthesis, WebRTC camera streams), table column layouts, and domain view components.
+The backend is organized into vertical domain slices under `server/modules/`. Cross-cutting infrastructure lives strictly in `server/core/`.
 
-### B. Directory & Routing Invariant
-
-* **Routes are Pure Coordinators**: `apps/*/src/routes/` is strictly reserved for SvelteKit routing artifacts (`+page.svelte`, `+layout.svelte`, `+layout.ts`, `layout.css`).
-* **Zero Route-Adjacent Helpers**: Never create helper scripts, `.svelte.ts` files, or subcomponent folders inside `src/routes/**/`. All feature logic and subcomponents must live under `apps/*/src/lib/<domain>/`.
-
-### C. The 250 LOC Feature Blueprint
-
-No `.svelte` or `.svelte.ts` file may exceed **250 lines of code**. When decomposing bloated files or adding features, organize the target domain under `apps/<app>/src/lib/<domain>/`:
-
-```
-src/lib/<domain>/
-├── <feature>-filter.ts         # Pure domain functions & metrics (no UI, tested via Vitest)
-├── <feature>-filter.test.ts    # Unit tests for domain calculations
-├── columns.ts                  # TanStack table column definitions (if tabular data)
-├── <feature>.svelte.ts         # Svelte 5 runes controller class ($state, $derived, validation)
-├── <feature>.test.ts           # Unit tests for state machine transitions
-└── components/                 # Presentational leaves (< 150 LOC each)
-    ├── <Feature>Header.svelte
-    └── <Feature>Dialog.svelte
-
-```
-
-### D. Svelte 5 Runes & Import Rules
-
-1. **Extension Dropping on `.svelte.ts` Imports**: When importing `.svelte.ts` modules into `.svelte` or `.ts` files, omit the `.ts` extension:
-```typescript
-// Correct
-import { ProductFormState } from '$lib/catalog/product-form.svelte';
-
-// WRONG - will cause bundler resolution errors
-import { ProductFormState } from '$lib/catalog/product-form.svelte.ts';
-
+```text
+server/
+├── core/                        # Cross-cutting infrastructure ONLY
+│   ├── config.py                # Pydantic Settings & environment variables
+│   ├── db.py                    # async_engine (psycopg / aiosqlite), AsyncSessionLocal, get_async_db
+│   ├── dependencies.py          # Auth validation, permission dependencies
+│   └── exceptions.py            # Global HTTP & domain exception handlers
+├── modules/
+│   ├── catalog/                 # Product domain
+│   │   ├── models.py            # SQLModel table: Product
+│   │   ├── schemas.py           # Request/response Pydantic models
+│   │   ├── router.py            # APIRouter(prefix="/products", tags=["catalog"])
+│   │   ├── service.py           # Product catalog queries & mutations
+│   │   └── barcode.py           # GS1 scale embedded barcode parser (20PPPPPWWWWWC)
+│   ├── inventory/               # Double-entry ledger domain
+│   │   ├── models.py            # SQLModel tables: StockItem, InventoryLedger
+│   │   ├── schemas.py           # Movement payloads (Receive, Adjust, Merma, Fulfill)
+│   │   ├── router.py            # APIRouter(prefix="/inventory", tags=["inventory"])
+│   │   ├── engine.py            # Atomic transaction mutation engine (OCC & ledger append)
+│   │   └── queries.py           # Point-in-time stock audit, reconciliation, and valuations
+│   └── identity/                # Authentication & User Management
+│       ├── models.py            # SQLModel table: User
+│       ├── schemas.py           # Login, profile, and role schemas
+│       ├── router.py            # APIRouter(prefix="/users", tags=["identity"])
+│       └── service.py           # Password hashing & JWT token issuance
+├── api/
+│   └── v1/
+│       └── router.py            # Explicit aggregate router (includes catalog, inventory, identity)
+└── main.py                      # FastAPI lifespan (metadata.create_all), app factory, mount /api/v1
 ```
 
+* **Explicit Routing Only**: Do NOT use dynamic reflection or filesystem-scanning router libraries. Each domain module exports a standard `router = APIRouter(...)`. Routers are imported and wired explicitly in `server/api/v1/router.py`:
+  ```python
+  from fastapi import APIRouter
+  from server.modules.catalog.router import router as catalog_router
+  from server.modules.identity.router import router as identity_router
+  from server.modules.inventory.router import router as inventory_router
 
-2. **State Lifecycle Patterns**:
-* **Ephemeral / Local State (Forms, Modals)**: Export an uninstantiated class (`export class ProductFormState { ... }`). The consuming component instantiates it: `const form = new ProductFormState()`.
-* **Persistent / Global State (POS Cart)**: Export a class alongside a shared singleton instance (`export const cart = new CartState()`).
+  v1_router = APIRouter(prefix="/v1")
+  v1_router.include_router(identity_router)
+  v1_router.include_router(catalog_router)
+  v1_router.include_router(inventory_router)
+  ```
 
+* **Strict Dependency Flow**: `core/` must NEVER import from `modules/`. Modules may import from `core/`. Modules must not import models directly from each other; reference foreign keys by table name strings (e.g., `foreign_key="products.id"`).
 
+### B. The 250 LOC Backend Blueprint
 
-### E. Styling Standards & Scoped CSS
+No single Python file under `server/` may exceed **250 lines of code**. When a file approaches this threshold:
+* **Split Read/Write Paths**: Monolithic services must be split into a mutation engine (`engine.py`) and a read/reporting service (`queries.py`).
+* **Extract Query Builders**: Complex SQL joins or aggregations belong in dedicated helper functions inside `queries.py`, never inline in endpoints.
+* **Thin Routers**: Routers are pure HTTP coordinators. Endpoints parse request models, call service/engine functions, translate domain exceptions to HTTP status codes, and return response schemas. Zero business logic or raw SQL execution inside `router.py`.
 
-* **Utility Discipline**: Never chain more than 4–5 utility classes on a single HTML tag. Keep markup clean, readable, and structural.
-* **Component-Scoped `<style>**`: For complex internal component layouts, animations, or responsive variant blocks, use native Svelte `<style>` tags at the bottom of the file rather than 100-character utility strings.
-* **Shared Primitives & `class` Merging**: All components in `@vitalcer/ui` must accept an optional `class` prop and merge via `cn()`, imported strictly from `@vitalcer/ui`.
+### C. Async MVCC & Double-Entry Ledger Invariants
+
+* **Zero Direct Balance Overwrites**:
+  * Stock balances in `products` or `stock_items` are NEVER overwritten directly via standalone `UPDATE` statements.
+  * Every physical stock variation must occur through an append-only `InventoryLedger` row (`quantity_delta`, `movement_type`, `balance_after`, `version_nonce`, `reference_id`).
+* **Append-Only Immutability**:
+  * Ledger rows are immutable. The ORM and application code must never issue `UPDATE` or `DELETE` queries on `InventoryLedger`.
+  * Stock corrections must take the form of compensating ledger entries (`ADJUST` or `MERMA`).
+* **Concurrency Control & Atomic Mutations**:
+  * Stock updates must run inside an explicit transaction context using either row locking (`select(...).with_for_update()`) or Optimistic Concurrency Control (OCC) via a version column:
+    ```python
+    async with session.begin():
+        stock = (
+            await session.exec(
+                select(StockItem).where(StockItem.product_id == product_id).with_for_update()
+            )
+        ).one_or_none()
+
+        # Mutate aggregate & append immutable ledger entry within the same atomic commit
+        ...
+    ```
+  * Never calculate stock balances in Python memory across uncommitted, non-locking reads.
+  * Ledger insertion and aggregate balance modification must happen within the exact same database transaction. Partial commits are strictly forbidden.
+
+### D. Async Session & Lifespan Invariants
+
+* **Async Session Lifecycle**:
+  * Endpoints must consume database sessions exclusively through `session: AsyncSession = Depends(get_async_db)`.
+  * Sessions are configured with `expire_on_commit=False`. Never call `session.refresh()` unless the database generates server-side defaults required immediately in the HTTP response.
+  * Never instantiate ad-hoc `AsyncSession` instances inside domain services or background tasks without guaranteeing disposal via an async context manager.
+* **Startup Metadata Registration (`create_all`)**:
+  * Because tables are created dynamically on startup via `conn.run_sync(Base.metadata.create_all)`, all SQLModel table classes must be imported into the application scope before the lifespan runs.
+  * Ensure `server/models/__init__.py` or the module routers explicitly import all table models so `SQLModel.metadata` is fully populated when `create_all` executes.
+* **Dual Engine Dialect Compatibility**:
+  * All code must execute cleanly on both PostgreSQL (`postgresql+psycopg://` via psycopg 3) and SQLite (`sqlite+aiosqlite:///`).
+  * Do NOT use Postgres-exclusive dialect types (such as `JSONB` or `ARRAY`) without standard fallback representations. SQLite compatibility must be preserved for rapid local testing.
+  * Always store timestamps as timezone-aware UTC: `datetime.now(timezone.utc)`.
+
+### E. Currency, Barcode & Data Invariants
+
+* **Whole ARS Integer Currency**:
+  * All prices, costs, line totals, and order amounts must be stored and processed as integers in whole Argentine Pesos (ARS) (`int`).
+  * Never use `float` or `Decimal` for currency columns or schemas.
+  * If a discount or unit conversion yields a fractional value, it must be explicitly rounded to the nearest whole integer (`round()`) before validation and persistence.
+* **GS1 Barcode Validation**:
+  * GS1 embedded-weight barcodes (`20PPPPPWWWWWC`) must be parsed and verified via checksum before being accepted by catalog or inventory movement endpoints.
+  * Parsed scale weights must be positive floats with fixed 3-decimal precision (grams/kilograms).
 
 ### F. Verification Gates
 
-Before declaring any frontend change or refactor complete, run and pass:
+Before declaring any backend feature, endpoint, or refactor complete, the following gates must execute and pass without error:
 
-1. `pnpm svelte-check` (zero TypeScript and Svelte warnings)
-2. `pnpm vitest run` (all unit tests passing)
-3. `pnpm biome check` (formatting and lint compliance)
-4. Production build (`make check` or static adapter build)
+1. `uv run ruff check .` (zero linting or syntax errors)
+2. `uv run ruff format --check .` (standard formatting compliance)
+3. `uv run basedpyright` (zero type-check errors across models, schemas, and engines)
+4. `uv run pytest` (100% passing tests across atomic ledger transactions, balance constraints, and endpoints)
+5. `uv run python scripts/api_export.py` (OpenAPI spec re-exported cleanly to keep `@vitalcer/api` in sync)
 
 ---
 
-## 6. Implementation Status & Roadmap
+## 7. Implementation Status & Roadmap
 
 - ✅ **Phase 1 (Data & Models)**: SQLModel database (`Product`, `User`, `InventoryLedger`), whole ARS integers, dual Postgres/SQLite test harness.
 - ✅ **Phase 2 (Mobile POS Cashier)**: Barcode camera scanner with GPU detector, cart state machine in Svelte 5 runes, Web Audio tones, Cash change calculation & payment modal, atomic batch checkout committing to ledger (`movement_type = 'sale_pos'`).
@@ -190,7 +240,7 @@ Before declaring any frontend change or refactor complete, run and pass:
 
 ---
 
-## 7. Tooling & Infrastructure Ledger
+## 8. Tooling & Infrastructure Ledger
 
 | Date | Change Summary | Affected Components |
 | :--- | :--- | :--- |
