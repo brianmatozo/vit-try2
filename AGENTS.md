@@ -108,6 +108,68 @@ make codegen     # Export OpenAPI & regenerate @vitalcer/api client
 
 ---
 
+## 5. Workspace Boundaries & Svelte 5 Architecture Contract
+
+### A. Package & Layer Boundaries
+
+* **`@vitalcer/core` (Domain Math & Invariants)**: Framework-agnostic pure TypeScript. GS1 barcode parsing, ARS integer currency math, and weight calculation logic. Must have zero DOM/browser dependencies and run cleanly in Node/Vitest.
+* **`@vitalcer/ui` (Design System Primitives)**: Generic, unstyled/Tailwind-styled UI primitives (Bits UI wrappers: Dialog, Button, Card, Input) and design tokens (`theme.css`). Must contain **zero domain knowledge** (no products, prices, barcodes, or cart types).
+* **`@vitalcer/api` (Network & Contracts)**: OpenAPI-generated client, Zod validation schemas, and TanStack Query option factories.
+* **`apps/*/src/lib/<domain>/` (App-Specific Features)**: State machines, browser APIs (audio synthesis, WebRTC camera streams), table column layouts, and domain view components.
+
+### B. Directory & Routing Invariant
+
+* **Routes are Pure Coordinators**: `apps/*/src/routes/` is strictly reserved for SvelteKit routing artifacts (`+page.svelte`, `+layout.svelte`, `+layout.ts`, `layout.css`).
+* **Zero Route-Adjacent Helpers**: Never create helper scripts, `.svelte.ts` files, or subcomponent folders inside `src/routes/**/`. All feature logic and subcomponents must live under `apps/*/src/lib/<domain>/`.
+
+### C. The 250 LOC Feature Blueprint
+
+No `.svelte` or `.svelte.ts` file may exceed **250 lines of code**. When decomposing bloated files or adding features, organize the target domain under `apps/<app>/src/lib/<domain>/`:
+
+```text
+src/lib/<domain>/
+├── <feature>-filter.ts         # Pure domain functions & metrics (no UI, tested via Vitest)
+├── <feature>-filter.test.ts    # Unit tests for domain calculations
+├── columns.ts                  # TanStack table column definitions (if tabular data)
+├── <feature>.svelte.ts         # Svelte 5 runes controller class ($state, $derived, validation)
+├── <feature>.test.ts           # Unit tests for state machine transitions
+└── components/                 # Presentational leaves (< 150 LOC each)
+    ├── <Feature>Header.svelte
+    └── <Feature>Dialog.svelte
+```
+
+### D. Svelte 5 Runes & Import Rules
+
+1. **Extension Dropping on `.svelte.ts` Imports**: When importing `.svelte.ts` modules into `.svelte` or `.ts` files, omit the `.ts` extension:
+   ```typescript
+   // Correct
+   import { ProductFormState } from '$lib/catalog/product-form.svelte';
+
+   // WRONG - will cause bundler resolution errors
+   import { ProductFormState } from '$lib/catalog/product-form.svelte.ts';
+   ```
+
+2. **State Lifecycle Patterns**:
+   * **Ephemeral / Local State (Forms, Modals)**: Export an uninstantiated class (`export class ProductFormState { ... }`). The consuming component instantiates it: `const form = new ProductFormState()`.
+   * **Persistent / Global State (POS Cart)**: Export a class alongside a shared singleton instance (`export const cart = new CartState()`).
+
+### E. Styling Standards & Scoped CSS
+
+* **Utility Discipline**: Never chain more than 4–5 utility classes on a single HTML tag. Keep markup clean, readable, and structural.
+* **Component-Scoped `<style>`**: For complex internal component layouts, animations, or responsive variant blocks, use native Svelte `<style>` tags at the bottom of the file rather than 100-character utility strings.
+* **Shared Primitives & `class` Merging**: All components in `@vitalcer/ui` must accept an optional `class` prop and merge via `cn()`, imported strictly from `@vitalcer/ui`.
+
+### F. Verification Gates
+
+Before declaring any frontend change or refactor complete, run and pass:
+
+1. `pnpm svelte-check` (zero TypeScript and Svelte warnings)
+2. `pnpm vitest run` (all unit tests passing)
+3. `pnpm biome check` (formatting and lint compliance)
+4. Production build (`make check` or static adapter build)
+
+---
+
 ## 6. Backend Architecture & Async SQLModel Contract
 
 ### A. Module Boundaries & Routing Invariant
@@ -181,9 +243,7 @@ No single Python file under `server/` may exceed **250 lines of code**. When a f
     async with session.begin():
         stock = (
             await session.exec(
-                select(StockItem)
-                .where(StockItem.product_id == product_id)
-                .with_for_update()
+                select(StockItem).where(StockItem.product_id == product_id).with_for_update()
             )
         ).one_or_none()
 
@@ -260,4 +320,3 @@ Before declaring any backend feature, endpoint, or refactor complete, the follow
 | **2026-10-16** | Added Windows Inno Setup installer pipeline (`vitalcer.iss`, `package.ps1`/`package.bat`, `vitalcer.spec`), dual-mode backend execution in `vitalcer_control.py`, frozen app path resolution in `service_manager.py`, accelerated portable PostgreSQL download, and `data/logs` auto-provisioning. | `scripts/windows/`, `pyproject.toml`, `docs/WINDOWS_SETUP.md`, `.gitignore`, `AGENTS.md` |
 | **2026-10-25** | Added Vitest to `apps/admin` devDependencies (`vitest ^3.0.0`) and configured `"test": "vitest run"` script for unit testing catalog TypeScript & rune modules. | `apps/admin/package.json`, `AGENTS.md` |
 | **2026-10-25** | Added Vitest to `apps/pos` devDependencies (`vitest ^3.0.0`) and configured `"test": "vitest run"` script for unit testing camera & POS rune modules. | `apps/pos/package.json`, `AGENTS.md` |
-| **2026-10-27** | Configured `.gitignore` to exclude receipt JSON extractions and test fixtures (`*_output.json`, `*_output.txt`, `tests/fixtures/`). | `.gitignore`, `AGENTS.md` |

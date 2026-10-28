@@ -55,6 +55,7 @@ class ProductUpdate(SQLModel):
     plu_code: str | None = None
     product_type: ProductType | None = None
     min_safety_buffer: int | None = Field(default=None, ge=0)
+    last_cost: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
     sync_pedidosya: bool | None = None
     sync_rappi: bool | None = None
@@ -66,6 +67,7 @@ class ProductResponse(ProductBase):
     id: int
     current_stock: int
     reserved_stock: int
+    last_cost: int | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -31,6 +31,10 @@ class Product(SQLModel, table=True):
     # If bulk: price per reference weight (e.g. 100 grams)
     unit_price: int
     bulk_reference_grams: int = Field(default=100)
+    last_cost: int | None = Field(
+        default=None,
+        description="Last supplier cost per sellable unit in whole ARS",
+    )
 
     # Inventory state (current calculated balance)
     current_stock: int = Field(default=0)
