@@ -202,6 +202,7 @@ Per [`AGENTS.md`](../AGENTS.md) Section 6.B and Section 6.C, the remito domain e
 4. **Explicit Aggregate Routing**: The router is explicitly mounted in `server/api/v1/router.py`:
    ```python
    from server.modules.remitos.router import router as remitos_router
+
    v1_router.include_router(remitos_router)
    ```
 5. **Centralized Domain Exceptions**: Endpoints eliminate repetitive `try...except` blocks, throwing typed domain exceptions (`EntityNotFoundError`, `InvalidMovementError`, `VitalcerException`) registered in `server/core/exceptions.py`. Custom handlers strictly emit `{"detail": exc.message}` to preserve OpenAPI and frontend toast contract consistency.

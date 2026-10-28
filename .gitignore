@@ -750,6 +750,11 @@ images
 images/
 images/*
 
+# Receipt JSON & extraction outputs
+*_output.json
+*_output.txt
+tests/fixtures/
+
 .agents/*
 .agents
 .agents/
