@@ -1,6 +1,7 @@
 import difflib
 import re
 import unicodedata
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
@@ -127,3 +128,39 @@ async def match_supplier_item(
         pkg.package_type,
         target_type,
     )
+
+
+async def upsert_alias_mapping(
+    db: AsyncSession,
+    supplier_name: str,
+    raw_description: str,
+    product_id: int,
+    multiplier: int,
+    package_type: str | None,
+    target_unit_type: TargetUnitType,
+) -> None:
+    """Upsert alias dictionary mapping for verified items."""
+    norm = normalize_supplier_text(raw_description)
+    stmt = select(SupplierProductMapping).where(
+        col(SupplierProductMapping.supplier_name).ilike(supplier_name),
+        SupplierProductMapping.raw_item_pattern == norm,
+    )
+    existing = (await db.scalars(stmt)).first()
+    if existing:
+        existing.product_id = product_id
+        existing.multiplier = multiplier
+        existing.package_type = package_type
+        existing.target_unit_type = target_unit_type
+        existing.times_used += 1
+        existing.last_matched_at = datetime.now(timezone.utc)
+    else:
+        db.add(
+            SupplierProductMapping(
+                supplier_name=supplier_name,
+                raw_item_pattern=norm,
+                product_id=product_id,
+                package_type=package_type,
+                multiplier=multiplier,
+                target_unit_type=target_unit_type,
+            )
+        )

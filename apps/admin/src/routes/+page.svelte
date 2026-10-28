@@ -107,7 +107,7 @@ const table = createAppTable({
 </script>
 
 {#snippet nameCellSnippet(product: ProductResponse)}
-  <div class="flex flex-col py-0.5 max-w-[180px] xs:max-w-[220px] sm:max-w-none">
+  <div class="flex flex-col py-0.5 max-w-44 xs:max-w-56 sm:max-w-none">
     <div class="flex items-center gap-1.5 flex-wrap">
       <span class="font-medium text-gray-900 leading-tight">{product.name}</span>
       <span class="md:hidden inline-flex items-center gap-1">
@@ -214,7 +214,7 @@ const table = createAppTable({
       </Button>
     </div>
   {:else}
-    <VirtualTable {table} height="calc(100vh - 330px)" class="min-h-[400px]" />
+    <VirtualTable {table} height="calc(100vh - 330px)" class="min-h-96" />
   {/if}
 </div>
 

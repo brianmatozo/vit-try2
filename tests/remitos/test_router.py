@@ -86,3 +86,34 @@ def test_get_nonexistent_remito_404(client: TestClient):
     resp = client.get("/api/v1/remitos/999999")
     assert resp.status_code == 404
     assert "not found" in resp.json()["detail"].lower()
+
+
+def test_remito_config_and_scan_images(client: TestClient):
+    # Test config GET and POST
+    c_resp = client.get("/api/v1/remitos/config")
+    assert c_resp.status_code == 200
+    assert "has_api_key" in c_resp.json()
+
+    up_resp = client.post(
+        "/api/v1/remitos/config",
+        json={"primary_model": "google/gemini-2.0-flash-001"},
+    )
+    assert up_resp.status_code == 200
+    assert up_resp.json()["primary_model"] == "google/gemini-2.0-flash-001"
+
+    # Test scan-images in mock mode
+    s_resp = client.post(
+        "/api/v1/remitos/scan-images",
+        json={"mock": True, "images": ["data:image/jpeg;base64,123"]},
+    )
+    assert s_resp.status_code == 201
+    remito = s_resp.json()
+    assert remito["status"] == "staged"
+
+    # Test patch header fiscal split
+    p_resp = client.patch(
+        f"/api/v1/remitos/{remito['id']}",
+        json={"fiscal_blanco_pct": 50, "fiscal_negro_pct": 50},
+    )
+    assert p_resp.status_code == 200
+    assert p_resp.json()["fiscal_blanco_bps"] == 5000

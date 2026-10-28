@@ -1,29 +1,125 @@
+import json
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from server.core.config import settings
 from server.core.dependencies import get_async_db
 from server.core.exceptions import EntityNotFoundError
+from server.modules.remitos.client import extract_remito
 from server.modules.remitos.models import (
     Remito,
     RemitoStatus,
     SupplierProductMapping,
 )
 from server.modules.remitos.schemas import (
+    ExtractedLineItem,
+    RemitoConfigDTO,
+    RemitoConfigUpdate,
+    RemitoHeaderUpdate,
     RemitoItemResponse,
     RemitoItemUpdate,
     RemitoResponse,
     RemitoVisionOutput,
+    ScanImagesRequest,
     SupplierMappingResponse,
 )
 from server.modules.remitos.service import (
     confirm_remito,
     reject_remito,
     scan_and_stage_remito,
+    update_remito_header,
     update_remito_item,
 )
 
 router = APIRouter(tags=["remitos"])
+
+
+@router.get("/remitos/config", response_model=RemitoConfigDTO)
+async def get_config():
+    """Get runtime configuration for OpenRouter vision extraction."""
+    return RemitoConfigDTO(
+        has_api_key=bool(settings.openrouter_api_key),
+        primary_model=settings.openrouter_primary_model,
+        fallback_model=settings.openrouter_fallback_model,
+    )
+
+
+@router.post("/remitos/config", response_model=RemitoConfigDTO)
+async def update_config(req: RemitoConfigUpdate):
+    """Update runtime configuration for OpenRouter vision extraction."""
+    if req.api_key is not None:
+        settings.openrouter_api_key = req.api_key
+    if req.primary_model is not None:
+        settings.openrouter_primary_model = req.primary_model
+    return RemitoConfigDTO(
+        has_api_key=bool(settings.openrouter_api_key),
+        primary_model=settings.openrouter_primary_model,
+        fallback_model=settings.openrouter_fallback_model,
+    )
+
+
+@router.post(
+    "/remitos/scan-images",
+    response_model=RemitoResponse,
+    status_code=201,
+)
+async def scan_images(
+    req: ScanImagesRequest,
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Scan receipt images and stage delivery note."""
+    if req.mock or not (req.api_key or settings.openrouter_api_key):
+        vision = RemitoVisionOutput(
+            supplier_name=req.supplier_name or "Distribuidora New Day",
+            remito_number=f"R-{datetime.now().strftime('%m%d-%H%M')}",
+            page_count=len(req.images) or 1,
+            items=[
+                ExtractedLineItem(
+                    line_index=0,
+                    raw_description="Barritas Almendra x 41 gr x 10 u",
+                    quantity=2,
+                    unit_cost=5000,
+                    line_total=10000,
+                    confidence=95,
+                ),
+                ExtractedLineItem(
+                    line_index=1,
+                    raw_description="Yerba Kalena x 2 kg x 5 u",
+                    quantity=3,
+                    unit_cost=12000,
+                    line_total=36000,
+                    confidence=88,
+                ),
+            ],
+            overall_confidence=92,
+        )
+    else:
+        vision = await extract_remito(
+            image_data_uris=req.images,
+            model=req.model,
+            api_key=req.api_key,
+        )
+
+    img_json = json.dumps(req.images) if req.images else None
+    return await scan_and_stage_remito(
+        db=db,
+        vision=vision,
+        image_paths=img_json,
+        blanco_bps=req.blanco_pct * 100,
+        negro_bps=req.negro_pct * 100,
+        iva_rate_bps=req.iva_pct * 100,
+    )
+
+
+@router.patch("/remitos/{id}", response_model=RemitoResponse)
+async def patch_remito(
+    id: int, req: RemitoHeaderUpdate, db: AsyncSession = Depends(get_async_db)
+):
+    """Update remito header fiscal split or notes and recalculate unit costs."""
+    return await update_remito_header(db=db, remito_id=id, req=req)
 
 
 @router.post(

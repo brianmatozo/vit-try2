@@ -40,13 +40,14 @@ async def extract_remito(
     image_data_uris: list[str],
     model: str | None = None,
     mock_response: RemitoVisionOutput | None = None,
+    api_key: str | None = None,
 ) -> RemitoVisionOutput:
     """Extract structured data from receipt images via OpenRouter or mock fixture."""
     if mock_response is not None:
         return mock_response
 
-    api_key = settings.openrouter_api_key
-    if not api_key:
+    key = api_key or settings.openrouter_api_key
+    if not key:
         raise ValueError("OPENROUTER_API_KEY is not configured")
 
     selected_model = model or settings.openrouter_primary_model or PRIMARY_MODEL
@@ -67,7 +68,7 @@ async def extract_remito(
     }
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {key}",
         "HTTP-Referer": "https://vitalcer.app",
         "X-OpenRouter-Title": "Vitalcer Remito Ingestion",
     }
@@ -88,6 +89,6 @@ async def extract_remito(
     # Fallback retry if low confidence
     if result.overall_confidence < 50 and selected_model == PRIMARY_MODEL:
         fallback = settings.openrouter_fallback_model or FALLBACK_MODEL
-        return await extract_remito(image_data_uris, model=fallback)
+        return await extract_remito(image_data_uris, model=fallback, api_key=key)
 
     return result

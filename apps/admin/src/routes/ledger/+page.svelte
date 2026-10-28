@@ -158,6 +158,6 @@ function handleRefresh() {
       </Button>
     </div>
   {:else}
-    <VirtualTable {table} height="calc(100vh - 300px)" class="min-h-[400px]" />
+    <VirtualTable {table} height="calc(100vh - 300px)" class="min-h-96" />
   {/if}
 </div>

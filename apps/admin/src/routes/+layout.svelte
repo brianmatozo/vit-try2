@@ -25,6 +25,7 @@ const queryClient = new QueryClient({
 
 const navLinks = [
 	{ href: '/', label: 'Catálogo de Productos', shortLabel: 'Catálogo' },
+	{ href: '/remitos', label: 'Remitos & Stock Inbound', shortLabel: 'Remitos' },
 	{ href: '/sales', label: 'Ventas de Caja', shortLabel: 'Ventas' },
 	{ href: '/ledger', label: 'Auditoría', shortLabel: 'Auditoría' },
 	{ href: '/actions', label: 'Acciones de Stock', shortLabel: 'Operaciones' },
@@ -49,7 +50,7 @@ const navLinks = [
 
           <nav class="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
             {#each navLinks as link (link.href)}
-              {@const isActive = page.url.pathname === link.href}
+              {@const isActive = link.href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(link.href)}
               <a
                 href={link.href}
                 class="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors whitespace-nowrap shrink-0 {isActive ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 font-medium'}"

@@ -129,3 +129,42 @@ class SupplierMappingResponse(BaseModel):
     times_used: int
     last_matched_at: datetime
     created_at: datetime
+
+
+class RemitoConfigDTO(BaseModel):
+    """Runtime configuration status for the OpenRouter vision client."""
+
+    has_api_key: bool
+    primary_model: str
+    fallback_model: str
+
+
+class RemitoConfigUpdate(BaseModel):
+    """Payload to update runtime OpenRouter vision settings."""
+
+    api_key: str | None = None
+    primary_model: str | None = None
+
+
+class ScanImagesRequest(BaseModel):
+    """Payload for uploading receipt images and triggering vision extraction."""
+
+    images: list[str] = Field(
+        default_factory=list, description="Base64 data URIs of receipt pages"
+    )
+    model: str | None = None
+    api_key: str | None = None
+    blanco_pct: int = 60
+    negro_pct: int = 40
+    iva_pct: int = 21
+    supplier_name: str | None = None
+    mock: bool = False
+
+
+class RemitoHeaderUpdate(BaseModel):
+    """Payload for updating remito header-level settings."""
+
+    fiscal_blanco_pct: int | None = None
+    fiscal_negro_pct: int | None = None
+    iva_pct: int | None = None
+    notes: str | None = None
