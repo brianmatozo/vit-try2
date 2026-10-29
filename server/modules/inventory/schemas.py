@@ -1,7 +1,8 @@
 """Pydantic / SQLModel schemas for inventory movements, merma, and audit trails."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
+from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 from server.modules.catalog.models import ProductType
@@ -111,6 +112,13 @@ class InventoryLedgerResponse(SQLModel):
     reference_id: str | None
     notes: str | None
     created_at: datetime
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_utc(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 class StockAuditResponse(SQLModel):

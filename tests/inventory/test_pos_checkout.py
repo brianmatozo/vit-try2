@@ -20,6 +20,7 @@ class TestPOSSale:
         assert entry["movement_type"] == "sale_pos"
         assert entry["quantity_delta"] == -400
         assert entry["balance_after"] == 2600
+        assert entry["created_at"].endswith("Z")
 
         prod = client.get(f"/api/v1/products/{product_id}").json()
         assert prod["current_stock"] == 2600
@@ -48,6 +49,7 @@ class TestPOSBatchSale:
         assert entry_map[p1]["quantity_delta"] == -300
         assert entry_map[p1]["balance_after"] == 700
         assert entry_map[p1]["movement_type"] == "sale_pos"
+        assert entry_map[p1]["created_at"].endswith("Z")
         assert entry_map[p2]["quantity_delta"] == -500
         assert entry_map[p2]["balance_after"] == 1500
 

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
@@ -32,7 +33,8 @@ class InventoryLedger(SQLModel, table=True):
     reference_id: str | None = Field(default=None, index=True)
     notes: str | None = None
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), index=True
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
 
     product: Optional["Product"] = Relationship(
