@@ -392,7 +392,7 @@ if __name__ == "__main__":
     print(" Vitalcer Store Server Manager CLI")
     print(f" Local Wi-Fi IP: {local_ip}")
     print(f" Mobile POS Camera Link: https://{local_ip}:5174")
-    print(" Admin Dashboard:        http://localhost:5173")
+    print(" Admin Dashboard:        https://localhost:5173")
     print("==================================================")
 
     if "--check" in sys.argv:

@@ -115,7 +115,7 @@ class VitalcerControlApp:
         net_card.pack(fill=tk.X, pady=(0, 12))
 
         pos_url = f"https://{self.local_ip}:5174"
-        admin_url = "http://localhost:5173"
+        admin_url = "https://localhost:5173"
 
         net_text = (
             f"• Lector de Cámara POS (Celulares en Wi-Fi):  {pos_url}\n"
@@ -203,7 +203,7 @@ class VitalcerControlApp:
                 "Caddy Web Server",
                 "5173 / 5174",
                 [
-                    ("Abrir Admin", lambda: webbrowser.open("http://localhost:5173")),
+                    ("Abrir Admin", lambda: webbrowser.open("https://localhost:5173")),
                     ("Abrir POS", lambda: webbrowser.open("https://localhost:5174")),
                 ],
             ),
@@ -323,7 +323,7 @@ class VitalcerControlApp:
             activebackground="#334155",
             padx=10,
             pady=4,
-            command=lambda: webbrowser.open("http://localhost:5173"),
+            command=lambda: webbrowser.open("https://localhost:5173"),
             cursor="hand2",
         )
         btn_open_admin.pack(side=tk.RIGHT, padx=6)

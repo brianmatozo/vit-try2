@@ -32,8 +32,9 @@
 	}
 }
 
-# Admin Backoffice Static SPA (Port 5173, HTTP)
-http://:5173 {
+# Admin Backoffice Static SPA (Port 5173, HTTPS with internal TLS)
+https://localhost:5173, https://127.0.0.1:5173, https://10.100.0.1:5173 {
+	tls internal
 	root * ./apps/admin/build
 	import api_proxy
 	import spa_static

@@ -12,7 +12,7 @@ El sistema funciona con **3 servicios coordinados** sin necesidad de Docker, WSL
 | :--- | :--- | :--- | :--- |
 | **PostgreSQL 18** | `5432` | TCP / PostgreSQL | Base de datos relacional con bloqueos atómicos (`SELECT FOR UPDATE`) para ventas concurrentes. |
 | **FastAPI Backend** | `8000` | HTTP (`/api/v1`) | Motor de inventario por partida doble y endpoints de cobro POS. |
-| **Caddy Web Server** | `5173` / `5174` | HTTP / **HTTPS** | Sirve el Admin (5173) y el POS Móvil (5174 con HTTPS y TLS interno automático para permisos de cámara). |
+| **Caddy Web Server** | `5173` / `5174` | **HTTPS** | Sirve el Admin (5173) y el POS Móvil (5174) con HTTPS y TLS interno automático para permisos de cámara W3C. |
 
 ---
 
@@ -69,7 +69,7 @@ Se abrirá una ventana nativa de Windows con:
 - **Botón `[⏹️ Detener Todo]`**: Apaga todos los procesos limpiamente y libera los puertos.
 - **Acceso Directo al POS y Admin**:
   - `[Abrir POS (Caja)]`: Abre `https://localhost:5174` en tu navegador.
-  - `[Abrir Admin]`: Abre `http://localhost:5173` para ver el catálogo y ventas de caja.
+  - `[Abrir Admin]`: Abre `https://localhost:5173` para ver el catálogo y ventas de caja.
   - `[API Docs]`: Abre la documentación interactiva Swagger (`/docs`).
 - **Consola de Registro en Vivo**: Muestra la salida de terminal y eventos en tiempo real.
 
