@@ -1,0 +1,10 @@
+## Implementation Status & Roadmap
+
+- ✅ **Phase 1 (Data & Models)**: SQLModel database (`Product`, `User`, `InventoryLedger`), whole ARS integers, dual Postgres/SQLite test harness.
+- ✅ **Phase 2 (Mobile POS Cashier)**: Barcode camera scanner with GPU detector, cart state machine in Svelte 5 runes, Web Audio tones, Cash change calculation & payment modal, atomic batch checkout committing to ledger (`movement_type = 'sale_pos'`).
+- ✅ **Phase 3 (Inventory & Backoffice)**: Append-only double-entry engine (`/receive`, `/merma`, `/adjust`, `/reserve`, `/fulfill`, `/audit`), Admin catalog with `@tanstack/svelte-virtual` table, stock operations (`/actions`), ledger audit (`/ledger`), and sales dashboard (`/sales`).
+- ✅ **Phase 3B (Remito Ingestion & Automated Stock Inbound)**: Vision AI pipeline (Gemini 2.0 Flash via OpenRouter), in-app model & API key configuration dialog (`RemitoConfigDialog`), packaging-to-unit converter, Argentine fiscal split calculator (60/40 blanco/negro + 21% IVA), Backoffice staging review UI (`/remitos`, `/remitos/new`, `/remitos/:id`), side-by-side receipt photo pan/zoom lightbox, and alias cache (`supplier_product_mappings`). Full spec: [`docs/remito_ingestion_specification.md`](docs/remito_ingestion_specification.md).
+- ⏳ **Phase 4A (Delivery Core & Mock Picking - Next)**: SQLModel tables (`DeliveryOrder`, `DeliveryOrderItem`), abstract `DeliveryAdapter`, virtual stock buffers & auto-pause, live picking UI (`/deliveries`) with acoustic alerts and v1 "Sin Stock / Quitar" removal switch, and mock simulation test harness.
+- ⏳ **Phase 4B (Platform Integrations & Bureaucracy)**: Incremental real platform onboarding (one at a time per merchant credentials), webhooks, and v2 advanced substitution engine.
+- ⏳ **Phase 5 (Financial Closing)**: Cierre de Caja (`/reports/cierre`), physical cash count (*Arqueo de caja*), daily shrinkage write-off.
+- ✅ **Infrastructure**: Caddy reverse proxy integration (pre-compressed Level 11 Brotli/Gzip at build-time, automatic internal TLS, zero-CORS API proxying, HTTP/2 & HTTP/3).
