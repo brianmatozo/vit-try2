@@ -1,7 +1,8 @@
 <script lang="ts">
 import { Button, Dialog, Input } from '@vitalcer/ui';
-import { AlertCircle } from 'lucide-svelte';
+import { AlertCircle, Camera } from 'lucide-svelte';
 import type { ProductFormState } from '../product-form.svelte';
+import BarcodeScannerInline from './BarcodeScannerInline.svelte';
 
 interface Props {
 	form: ProductFormState;
@@ -10,6 +11,14 @@ interface Props {
 }
 
 let { form, isSubmitting, onSubmit }: Props = $props();
+
+let isScanning = $state(false);
+
+$effect(() => {
+	if (!form.isOpen) {
+		isScanning = false;
+	}
+});
 </script>
 
 <Dialog
@@ -31,12 +40,24 @@ let { form, isSubmitting, onSubmit }: Props = $props();
         <label for="prod-sku" class="block text-xs font-semibold text-gray-700 mb-1">
           PLU / Código de Barras *
         </label>
-        <Input
-          id="prod-sku"
-          placeholder="Ej: 7791234567890 o ALF-01"
-          bind:value={form.sku}
-          required
-        />
+        <div class="relative flex items-center">
+          <Input
+            id="prod-sku"
+            placeholder="Ej: 7791234567890 o ALF-01"
+            bind:value={form.sku}
+            required
+            class="pr-10"
+          />
+          <button
+            type="button"
+            onclick={() => (isScanning = !isScanning)}
+            class="absolute right-1.5 p-1.5 rounded-md text-gray-500 hover:text-emerald-700 hover:bg-emerald-50 transition active:scale-95"
+            title={isScanning ? 'Cerrar escáner' : 'Escanear con cámara'}
+            aria-label={isScanning ? 'Cerrar escáner' : 'Escanear con cámara'}
+          >
+            <Camera class="w-4 h-4 {isScanning ? 'text-emerald-600' : ''}" />
+          </button>
+        </div>
       </div>
 
       <div>
@@ -52,6 +73,21 @@ let { form, isSubmitting, onSubmit }: Props = $props();
           <option value="bulk">Pesable / Granel (Balanza)</option>
         </select>
       </div>
+
+      {#if isScanning}
+        <div class="sm:col-span-2">
+          <BarcodeScannerInline
+            active={isScanning}
+            onscan={(code) => {
+              form.sku = code;
+              isScanning = false;
+            }}
+            onclose={() => {
+              isScanning = false;
+            }}
+          />
+        </div>
+      {/if}
     </div>
 
     <div>
