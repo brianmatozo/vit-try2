@@ -6,6 +6,7 @@ import {
 	formatTicketDate,
 	groupLedgerSales,
 	isToday,
+	parseIsoDate,
 } from './sales-metrics';
 
 const mockDiscreteProduct: ProductResponse = {
@@ -87,7 +88,31 @@ describe('groupLedgerSales', () => {
 
 		// Total: $3000 + $15000 = $18000
 		expect(t.totalAmount).toBe(18000);
-		expect(t.totalUnitsOrLines).toBe(2);
+		expect(t.totalUnits).toBe(3); // 2 discrete units + 1 bulk packet
+		expect(t.totalUnitsOrLines).toBe(3);
+	});
+
+	it('correctly parses naive ISO strings without timezone as UTC', () => {
+		const entries: InventoryLedgerResponse[] = [
+			{
+				id: 110,
+				product_id: 1,
+				quantity_delta: -3,
+				balance_after: 35,
+				movement_type: 'sale_pos',
+				reference_id: 'TKT-NAIVE',
+				notes: null,
+				created_at: '2026-10-29T02:07:08.402996',
+			},
+		];
+
+		const tickets = groupLedgerSales(entries, productsMap);
+		expect(tickets).toHaveLength(1);
+		// In UTC-3, 2026-10-29 02:07:08 UTC is 2026-10-28 23:07:08 local
+		const localDate = tickets[0].date;
+		expect(localDate.getUTCHours()).toBe(2);
+		expect(localDate.getUTCMinutes()).toBe(7);
+		expect(tickets[0].totalUnits).toBe(3);
 	});
 
 	it('creates fallback ticket ID when reference_id is missing', () => {
@@ -159,6 +184,28 @@ describe('groupLedgerSales', () => {
 	});
 });
 
+describe('parseIsoDate', () => {
+	it('handles timestamps ending with Z', () => {
+		const d = parseIsoDate('2026-10-25T10:00:00Z');
+		expect(d.getUTCHours()).toBe(10);
+	});
+
+	it('appends Z to naive timestamps lacking timezone info', () => {
+		const d = parseIsoDate('2026-10-29T02:07:08.402996');
+		expect(d.getUTCFullYear()).toBe(2026);
+		expect(d.getUTCMonth()).toBe(9); // October
+		expect(d.getUTCDate()).toBe(29);
+		expect(d.getUTCHours()).toBe(2);
+		expect(d.getUTCMinutes()).toBe(7);
+	});
+
+	it('preserves timestamps with explicit timezone offsets', () => {
+		const d = parseIsoDate('2026-10-28T23:07:08-03:00');
+		expect(d.getUTCHours()).toBe(2);
+		expect(d.getUTCDate()).toBe(29);
+	});
+});
+
 describe('isToday', () => {
 	it('correctly identifies today vs different dates', () => {
 		const fixedNow = new Date('2026-10-25T14:00:00Z');
@@ -180,6 +227,7 @@ describe('calculateSalesKpis', () => {
 				date: new Date('2026-10-25T10:00:00Z'),
 				items: [],
 				totalAmount: 10000,
+				totalUnits: 2,
 				totalUnitsOrLines: 2,
 			},
 			{
@@ -188,6 +236,7 @@ describe('calculateSalesKpis', () => {
 				date: new Date('2026-10-25T11:00:00Z'),
 				items: [],
 				totalAmount: 20000,
+				totalUnits: 3,
 				totalUnitsOrLines: 3,
 			},
 			{
@@ -196,6 +245,7 @@ describe('calculateSalesKpis', () => {
 				date: new Date('2026-10-20T11:00:00Z'),
 				items: [],
 				totalAmount: 50000,
+				totalUnits: 5,
 				totalUnitsOrLines: 5,
 			},
 		];
@@ -217,6 +267,7 @@ describe('calculateSalesKpis', () => {
 				date: new Date('2026-10-20T11:00:00Z'),
 				items: [],
 				totalAmount: 50000,
+				totalUnits: 5,
 				totalUnitsOrLines: 5,
 			},
 		];
@@ -246,6 +297,7 @@ describe('filterTickets', () => {
 				},
 			],
 			totalAmount: 1500,
+			totalUnits: 1,
 			totalUnitsOrLines: 1,
 		},
 		{
@@ -265,6 +317,7 @@ describe('filterTickets', () => {
 				},
 			],
 			totalAmount: 12000,
+			totalUnits: 1,
 			totalUnitsOrLines: 1,
 		},
 	];

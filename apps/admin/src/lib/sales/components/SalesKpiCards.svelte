@@ -72,7 +72,7 @@ let { kpis }: Props = $props();
 			<div class="text-xl sm:text-2xl font-black text-gray-900">
 				{kpis.totalItemsSoldToday}
 			</div>
-			<div class="text-xs text-gray-400 mt-0.5">Líneas de venta hoy</div>
+			<div class="text-xs text-gray-400 mt-0.5">Unidades vendidas hoy</div>
 		</div>
 	</Card>
 </div>

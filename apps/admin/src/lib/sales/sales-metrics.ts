@@ -19,6 +19,7 @@ export interface TicketGroup {
 	date: Date;
 	items: TicketItem[];
 	totalAmount: number;
+	totalUnits: number;
 	totalUnitsOrLines: number;
 }
 
@@ -28,6 +29,18 @@ export interface SalesKpiMetrics {
 	totalTicketsCount: number;
 	averageTicketToday: number;
 	totalItemsSoldToday: number;
+}
+
+/**
+ * Safely parses an ISO date string, ensuring strings without explicit timezone
+ * indicators are treated as UTC so local day comparisons are accurate.
+ */
+export function parseIsoDate(isoDate: string): Date {
+	if (!isoDate) return new Date();
+	const hasTimezone =
+		isoDate.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(isoDate);
+	const normalized = hasTimezone ? isoDate : `${isoDate}Z`;
+	return new Date(normalized);
 }
 
 /**
@@ -48,9 +61,10 @@ export function groupLedgerSales(
 			group = {
 				ticketId,
 				createdAt: entry.created_at,
-				date: new Date(entry.created_at),
+				date: parseIsoDate(entry.created_at),
 				items: [],
 				totalAmount: 0,
+				totalUnits: 0,
 				totalUnitsOrLines: 0,
 			};
 			map.set(ticketId, group);
@@ -92,8 +106,10 @@ export function groupLedgerSales(
 			subtotal,
 		});
 
+		const units = productType === 'bulk' ? 1 : qty;
 		group.totalAmount += subtotal;
-		group.totalUnitsOrLines += 1;
+		group.totalUnits += units;
+		group.totalUnitsOrLines = group.totalUnits;
 	}
 
 	return Array.from(map.values()).sort(
@@ -131,7 +147,7 @@ export function calculateSalesKpis(
 			? Math.round(totalRevenueToday / todayTicketsCount)
 			: 0;
 	const totalItemsSoldToday = todayTickets.reduce(
-		(acc, t) => acc + t.totalUnitsOrLines,
+		(acc, t) => acc + (t.totalUnits ?? t.totalUnitsOrLines ?? 0),
 		0,
 	);
 
@@ -168,7 +184,7 @@ export function filterTickets(
  * Formats ISO timestamp to Argentine standard datetime format.
  */
 export function formatTicketDate(isoDate: string): string {
-	const d = new Date(isoDate);
+	const d = parseIsoDate(isoDate);
 	if (Number.isNaN(d.getTime())) return isoDate;
 	return d.toLocaleString('es-AR', {
 		day: '2-digit',

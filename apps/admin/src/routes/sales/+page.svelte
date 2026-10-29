@@ -1,5 +1,5 @@
 <script lang="ts">
-import { createQuery, useQueryClient } from '@tanstack/svelte-query';
+import { createQuery } from '@tanstack/svelte-query';
 import {
 	getInventoryLedgerOptions,
 	type InventoryLedgerResponse,
@@ -15,18 +15,18 @@ import SalesKpiCards from '$lib/sales/components/SalesKpiCards.svelte';
 import SalesTicketCard from '$lib/sales/components/SalesTicketCard.svelte';
 import { SalesState } from '$lib/sales/sales-state.svelte';
 
-const queryClient = useQueryClient();
 const state = new SalesState();
 
-// Query completed POS sales from immutable ledger
-const ledgerQuery = createQuery(() =>
-	getInventoryLedgerOptions({
+// Query completed POS sales from immutable ledger (staleTime: 0 ensures always fetching latest sales)
+const ledgerQuery = createQuery(() => ({
+	...getInventoryLedgerOptions({
 		query: {
 			movement_type: 'sale_pos',
 			limit: 500,
 		},
 	}),
-);
+	staleTime: 0,
+}));
 
 // Query product catalog for name, SKU, and unit prices
 const productsQuery = createQuery(() =>
@@ -52,12 +52,7 @@ $effect(() => {
 });
 
 async function handleRefresh() {
-	await Promise.all([
-		queryClient.invalidateQueries({ queryKey: ['getInventoryLedger'] }),
-		queryClient.invalidateQueries({
-			queryKey: ['productReadMultiApiV1ProductsGet'],
-		}),
-	]);
+	await Promise.all([ledgerQuery.refetch(), productsQuery.refetch()]);
 }
 </script>
 
