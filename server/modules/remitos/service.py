@@ -4,7 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
 from sqlmodel import select
 
-from server.core.exceptions import EntityNotFoundError, InvalidMovementError
+from server.core.exceptions import (
+    EntityNotFoundError,
+    InvalidMovementError,
+    RemitoConflictError,
+)
 from server.modules.catalog.models import Product
 from server.modules.inventory.models import InventoryLedger
 from server.modules.remitos.fiscal import compute_unit_cost
@@ -41,6 +45,7 @@ async def scan_and_stage_remito(
         status=RemitoStatus.STAGED,
         image_paths=image_paths,
         page_count=vision.page_count,
+        overall_confidence=vision.overall_confidence,
         fiscal_blanco_bps=blanco_bps,
         fiscal_negro_bps=negro_bps,
         iva_rate_bps=iva_rate_bps,
@@ -48,8 +53,8 @@ async def scan_and_stage_remito(
     )
     db.add(remito)
     await db.flush()
-    assert remito.id is not None
-    remito_id: int = remito.id
+    remito_id = remito.id
+    assert remito_id is not None
 
     total_real = 0
     for it in vision.items:
@@ -94,12 +99,11 @@ async def scan_and_stage_remito(
 
 async def _get_staged_remito(db: AsyncSession, remito_id: int) -> Remito:
     """Fetch locked remito and assert it is in STAGED status."""
-    stmt = select(Remito).where(Remito.id == remito_id).with_for_update()
-    remito = (await db.scalars(stmt)).first()
-    if not remito:
+    q = select(Remito).where(Remito.id == remito_id).with_for_update()
+    if not (remito := (await db.scalars(q)).first()):
         raise EntityNotFoundError("Remito", remito_id)
     if remito.status != RemitoStatus.STAGED:
-        raise InvalidMovementError(f"Remito is {remito.status}, expected staged")
+        raise RemitoConflictError(f"Remito is {remito.status}, expected staged")
     return remito
 
 
@@ -107,31 +111,30 @@ async def update_remito_item(
     db: AsyncSession, remito_id: int, item_id: int, req: RemitoItemUpdate
 ) -> RemitoItem:
     """Inline update a staged remito line item."""
-    stmt = select(RemitoItem).where(
+    q = select(RemitoItem).where(
         RemitoItem.id == item_id, RemitoItem.remito_id == remito_id
     )
-    item = (await db.scalars(stmt)).first()
-    if not item:
+    if not (item := (await db.scalars(q)).first()):
         raise EntityNotFoundError("RemitoItem", item_id)
 
     remito = await _get_staged_remito(db, remito_id)
 
     if req.product_id is not None:
-        item.product_id = req.product_id
-        item.match_strategy = MatchStrategy.MANUAL_OVERRIDE
-        item.match_confidence = 100
-        item.is_verified_by_user = True
+        item.product_id, item.match_strategy = (
+            req.product_id,
+            MatchStrategy.MANUAL_OVERRIDE,
+        )
+        item.match_confidence, item.is_verified_by_user = 100, True
 
-    fields = (
+    for attr in (
         "multiplier",
         "package_type",
         "target_unit_type",
         "effective_quantity",
         "is_verified_by_user",
-    )
-    for a in fields:
-        if (v := getattr(req, a, None)) is not None:
-            setattr(item, a, v)
+    ):
+        if (v := getattr(req, attr, None)) is not None:
+            setattr(item, attr, v)
 
     item.quantity_to_commit = item.effective_quantity * item.multiplier
     cost = compute_unit_cost(
@@ -163,8 +166,9 @@ async def update_remito_header(
     if req.notes is not None:
         remito.notes = req.notes
 
-    stmt = select(RemitoItem).where(RemitoItem.remito_id == remito_id)
-    items = (await db.scalars(stmt)).all()
+    items = (
+        await db.scalars(select(RemitoItem).where(RemitoItem.remito_id == remito_id))
+    ).all()
     total_real = 0
     for it in items:
         cost = compute_unit_cost(
@@ -204,14 +208,13 @@ async def confirm_remito(db: AsyncSession, remito_id: int) -> Remito:
         prod_q = select(Product).options(noload("*")).where(Product.id == it.product_id)
         prod = (await db.scalars(prod_q.with_for_update())).one()
         assert prod.id is not None
-        prod_id: int = prod.id
         prod.current_stock += it.quantity_to_commit
         prod.last_cost = it.calculated_unit_cost
 
         remito_ref = remito.remito_number or remito.id
         db.add(
             InventoryLedger(
-                product_id=prod_id,
+                product_id=prod.id,
                 movement_type="receiving",
                 quantity_delta=it.quantity_to_commit,
                 balance_after=prod.current_stock,
@@ -221,13 +224,13 @@ async def confirm_remito(db: AsyncSession, remito_id: int) -> Remito:
         )
 
         await upsert_alias_mapping(
-            db=db,
-            supplier_name=remito.supplier_name,
-            raw_description=it.raw_description,
-            product_id=prod_id,
-            multiplier=it.multiplier,
-            package_type=it.package_type,
-            target_unit_type=it.target_unit_type,
+            db,
+            remito.supplier_name,
+            it.raw_description,
+            prod.id,
+            it.multiplier,
+            it.package_type,
+            it.target_unit_type,
         )
 
     remito.status = RemitoStatus.COMMITTED

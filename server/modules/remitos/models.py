@@ -45,6 +45,7 @@ class Remito(SQLModel, table=True):
     image_paths: str | None = None
     page_count: int = 1
     raw_llm_payload: str | None = None
+    overall_confidence: int | None = Field(default=None)
 
     # Fiscal parameters (stored as basis points: 6000 = 60.00%)
     fiscal_blanco_bps: int = Field(default=6000)

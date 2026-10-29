@@ -8,6 +8,7 @@ dependencies = [
   "aiosqlite>=0.22.1",
   "fastapi[standard]>=0.136.1",
   "fastcrud>=0.22.3",
+  "pillow>=13.0.0",
   "psycopg[binary]>=3.3.4",
   "sqlalchemy>=2.0.49",
   "sqlmodel>=0.0.42",

@@ -60,6 +60,11 @@ export class RemitoDetailState {
 		return this.discrepancyArs > threshold;
 	});
 
+	isLowConfidence = $derived.by<boolean>(() => {
+		if (!this.remito) return false;
+		return (this.remito.overall_confidence ?? 100) < 40;
+	});
+
 	initFromRemito(r: RemitoResponse): void {
 		this.remito = r;
 		this.fiscalBlancoPct = Math.round(r.fiscal_blanco_bps / 100);

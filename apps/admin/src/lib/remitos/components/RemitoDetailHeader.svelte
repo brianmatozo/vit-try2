@@ -1,6 +1,12 @@
 <script lang="ts">
 import { Badge, Button } from '@vitalcer/ui';
-import { AlertCircle, ArrowLeft, CheckCircle, XCircle } from 'lucide-svelte';
+import {
+	AlertCircle,
+	AlertTriangle,
+	ArrowLeft,
+	CheckCircle,
+	XCircle,
+} from 'lucide-svelte';
 import type { RemitoDetailState } from '../remito-detail-state.svelte';
 
 interface Props {
@@ -76,6 +82,28 @@ let { remitoId, detailState, actionFeedback, onConfirm, onReject }: Props =
 		<div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
 			<CheckCircle class="w-4 h-4 text-emerald-600 shrink-0" />
 			<span>{actionFeedback}</span>
+		</div>
+	{/if}
+
+	<!-- Low OCR Confidence Banner -->
+	{#if detailState.isLowConfidence && detailState.remito?.status === 'staged'}
+		<div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+			<AlertCircle class="w-4 h-4 text-amber-600 shrink-0" />
+			<span>
+				⚠️ Comprobante con baja legibilidad (confianza general {detailState.remito?.overall_confidence}%). Verifique detenidamente los ítems contra la foto.
+			</span>
+		</div>
+	{/if}
+
+	<!-- Discrepancy Warning Banner -->
+	{#if detailState.hasSignificantDiscrepancy && detailState.remito?.status === 'staged'}
+		<div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+			<div class="flex items-center gap-2">
+				<AlertTriangle class="w-4 h-4 text-amber-600 shrink-0" />
+				<span>
+					⚠️ La suma de líneas (${detailState.computedLinesSum.toLocaleString('es-AR')}) difiere del total del comprobante (${(detailState.remito?.total_raw_amount || 0).toLocaleString('es-AR')}) en ${detailState.discrepancyArs.toLocaleString('es-AR')}. Revise las cantidades y precios.
+				</span>
+			</div>
 		</div>
 	{/if}
 

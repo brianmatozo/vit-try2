@@ -67,6 +67,46 @@ class InvalidMovementError(VitalcerException):
         super().__init__(message, code=code)
 
 
+class RemitoConflictError(InvalidMovementError):
+    """Raised when remito status conflicts with requested action (maps to HTTP 409)."""
+
+    def __init__(self, message: str, code: str = "REMITO_CONFLICT") -> None:
+        super().__init__(message, code=code)
+
+
+class CorruptImageError(VitalcerException):
+    """Raised when an image payload is invalid or unreadable (maps to HTTP 400)."""
+
+    def __init__(
+        self,
+        message: str = "Archivo de imagen corrupto o formato no soportado.",
+        code: str = "CORRUPT_IMAGE",
+    ) -> None:
+        super().__init__(message, code=code)
+
+
+class VisionExtractionError(VitalcerException):
+    """Raised when vision output is unparseable or malformed (maps to HTTP 422)."""
+
+    def __init__(
+        self,
+        message: str = "No se pudo interpretar el formato del comprobante.",
+        code: str = "VISION_EXTRACTION_ERROR",
+    ) -> None:
+        super().__init__(message, code=code)
+
+
+class VisionGatewayError(VitalcerException):
+    """Raised when OpenRouter API is unreachable or fails (maps to HTTP 502)."""
+
+    def __init__(
+        self,
+        message: str = "Error al comunicarse con el servicio de visión OpenRouter.",
+        code: str = "VISION_GATEWAY_ERROR",
+    ) -> None:
+        super().__init__(message, code=code)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register global exception handlers preserving standard {'detail': str}
     along with additive machine-readable 'code'.
@@ -96,6 +136,40 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(RemitoConflictError)
+    async def remito_conflict_handler(
+        _: Request, exc: RemitoConflictError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(CorruptImageError)
+    async def corrupt_image_handler(_: Request, exc: CorruptImageError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(VisionExtractionError)
+    async def vision_extraction_handler(
+        _: Request, exc: VisionExtractionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(VisionGatewayError)
+    async def vision_gateway_handler(
+        _: Request, exc: VisionGatewayError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             content={"detail": exc.message, "code": exc.code},
         )
 

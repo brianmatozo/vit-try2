@@ -99,5 +99,20 @@ describe('RemitoDetailState', () => {
 		expect(state.computedLinesSum).toBe(10000);
 		expect(state.discrepancyArs).toBe(0);
 		expect(state.hasSignificantDiscrepancy).toBe(false);
+
+		// When discrepancy exceeds 1% of total_raw_amount
+		if (state.remito) {
+			state.remito.total_raw_amount = 9000; // 1000 ARS discrepancy > 90 ARS threshold
+		}
+		expect(state.discrepancyArs).toBe(1000);
+		expect(state.hasSignificantDiscrepancy).toBe(true);
+	});
+
+	it('detects low OCR confidence correctly', () => {
+		expect(state.isLowConfidence).toBe(false);
+		if (state.remito) {
+			state.remito.overall_confidence = 35;
+		}
+		expect(state.isLowConfidence).toBe(true);
 	});
 });

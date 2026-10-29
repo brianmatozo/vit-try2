@@ -110,6 +110,7 @@ class RemitoResponse(BaseModel):
     iva_rate_bps: int
     total_raw_amount: int
     total_real_amount: int
+    overall_confidence: int | None = None
     notes: str | None = None
     created_at: datetime
     committed_at: datetime | None = None

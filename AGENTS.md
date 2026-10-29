@@ -292,3 +292,11 @@ Before declaring any backend feature, endpoint, or refactor complete, the follow
 ## 7. Rukes made by me, the human:
 - write the changes in changelog: /home/brian/dev/changelog.md
 - when asked what needs to be done see: /home/brian/dev/todo.md
+
+---
+
+## 8. Tooling & Infrastructure Ledger
+
+| Date | Tooling / Infrastructure Change | Notes & Rationale |
+| :--- | :--- | :--- |
+| **2026-10-29** | Added `pillow` (`>=13.0.0`) to `pyproject.toml` dependencies. | Required by Remito Ingestion Phase 7 image preprocessing pipeline: Pillow handles EXIF auto-rotation (`ImageOps.exif_transpose`), Lanczos downscaling to $\le 2048$px, WebP pre-compression, and corrupted image detection (`CorruptImageError` HTTP 400). |

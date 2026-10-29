@@ -1,5 +1,6 @@
 """Remito ingestion and automated stock inbound vertical slice."""
 
+from server.modules.remitos.audit import validate_line_totals
 from server.modules.remitos.client import extract_remito
 from server.modules.remitos.converter import PackageParseResult, parse_packaging
 from server.modules.remitos.fiscal import FiscalCostResult, compute_unit_cost
@@ -42,4 +43,5 @@ __all__ = [
     "extract_remito",
     "parse_packaging",
     "router",
+    "validate_line_totals",
 ]

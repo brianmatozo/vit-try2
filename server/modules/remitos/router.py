@@ -8,7 +8,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from server.core.config import settings
 from server.core.dependencies import get_async_db
 from server.core.exceptions import EntityNotFoundError
-from server.modules.remitos.client import extract_remito
+from server.modules.remitos.client import (
+    extract_remito,
+    preprocess_image_data_uri,
+)
 from server.modules.remitos.models import (
     Remito,
     RemitoStatus,
@@ -71,11 +74,18 @@ async def scan_images(
     db: AsyncSession = Depends(get_async_db),
 ):
     """Scan receipt images and stage delivery note."""
+    processed_images: list[str] = []
+    for img in req.images:
+        if not req.mock:
+            processed_images.append(preprocess_image_data_uri(img))
+        else:
+            processed_images.append(img)
+
     if req.mock or not (req.api_key or settings.openrouter_api_key):
         vision = RemitoVisionOutput(
             supplier_name=req.supplier_name or "Distribuidora New Day",
             remito_number=f"R-{datetime.now().strftime('%m%d-%H%M')}",
-            page_count=len(req.images) or 1,
+            page_count=len(processed_images) or 1,
             items=[
                 ExtractedLineItem(
                     line_index=0,
@@ -98,12 +108,12 @@ async def scan_images(
         )
     else:
         vision = await extract_remito(
-            image_data_uris=req.images,
+            image_data_uris=processed_images,
             model=req.model,
             api_key=req.api_key,
         )
 
-    img_json = json.dumps(req.images) if req.images else None
+    img_json = json.dumps(processed_images) if processed_images else None
     return await scan_and_stage_remito(
         db=db,
         vision=vision,
