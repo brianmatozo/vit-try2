@@ -1,110 +1,33 @@
-from datetime import datetime, timezone
-
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload
 from sqlmodel import select
 
-from server.core.exceptions import (
-    EntityNotFoundError,
-    InvalidMovementError,
-    RemitoConflictError,
+from server.core.exceptions import EntityNotFoundError
+from server.modules.remitos.engine import (
+    _get_staged_remito,
+    confirm_remito,
+    reject_remito,
 )
-from server.modules.catalog.models import Product
-from server.modules.inventory.models import InventoryLedger
 from server.modules.remitos.fiscal import compute_unit_cost
-from server.modules.remitos.matching import (
-    match_supplier_item,
-    upsert_alias_mapping,
-)
 from server.modules.remitos.models import (
     MatchStrategy,
     Remito,
     RemitoItem,
-    RemitoStatus,
     TargetUnitType,
 )
 from server.modules.remitos.schemas import (
     RemitoHeaderUpdate,
     RemitoItemUpdate,
-    RemitoVisionOutput,
 )
+from server.modules.remitos.staging import scan_and_stage_remito
 
-
-async def scan_and_stage_remito(
-    db: AsyncSession,
-    vision: RemitoVisionOutput,
-    image_paths: str | None = None,
-    blanco_bps: int = 6000,
-    negro_bps: int = 4000,
-    iva_rate_bps: int = 2100,
-) -> Remito:
-    """Create a staged remito header and line items with initial matching."""
-    remito = Remito(
-        remito_number=vision.remito_number,
-        supplier_name=vision.supplier_name.strip(),
-        status=RemitoStatus.STAGED,
-        image_paths=image_paths,
-        page_count=vision.page_count,
-        overall_confidence=vision.overall_confidence,
-        fiscal_blanco_bps=blanco_bps,
-        fiscal_negro_bps=negro_bps,
-        iva_rate_bps=iva_rate_bps,
-        total_raw_amount=sum(it.line_total for it in vision.items),
-    )
-    db.add(remito)
-    await db.flush()
-    remito_id = remito.id
-    assert remito_id is not None
-
-    total_real = 0
-    for it in vision.items:
-        pid, conf, strat, mult, pkg_t, target_t = await match_supplier_item(
-            db, vision.supplier_name, it.raw_description
-        )
-        cost = compute_unit_cost(
-            it.unit_cost,
-            mult,
-            blanco_bps,
-            negro_bps,
-            iva_rate_bps,
-            is_bulk=target_t == TargetUnitType.BULK_GRAMS,
-        )
-        total_real += it.quantity * cost.real_pack_cost
-
-        db.add(
-            RemitoItem(
-                remito_id=remito_id,
-                line_index=it.line_index,
-                raw_description=it.raw_description,
-                extracted_quantity=it.quantity,
-                extracted_unit_cost=it.unit_cost,
-                extracted_line_total=it.line_total,
-                product_id=pid,
-                package_type=pkg_t,
-                multiplier=mult,
-                target_unit_type=target_t,
-                effective_quantity=it.quantity,
-                quantity_to_commit=it.quantity * mult,
-                calculated_unit_cost=cost.real_unit_cost,
-                match_confidence=conf,
-                match_strategy=strat,
-            )
-        )
-
-    remito.total_real_amount = total_real
-    await db.commit()
-    await db.refresh(remito)
-    return remito
-
-
-async def _get_staged_remito(db: AsyncSession, remito_id: int) -> Remito:
-    """Fetch locked remito and assert it is in STAGED status."""
-    q = select(Remito).where(Remito.id == remito_id).with_for_update()
-    if not (remito := (await db.scalars(q)).first()):
-        raise EntityNotFoundError("Remito", remito_id)
-    if remito.status != RemitoStatus.STAGED:
-        raise RemitoConflictError(f"Remito is {remito.status}, expected staged")
-    return remito
+__all__ = [
+    "_get_staged_remito",
+    "confirm_remito",
+    "reject_remito",
+    "scan_and_stage_remito",
+    "update_remito_header",
+    "update_remito_item",
+]
 
 
 async def update_remito_item(
@@ -183,67 +106,6 @@ async def update_remito_header(
         total_real += it.effective_quantity * cost.real_pack_cost
 
     remito.total_real_amount = total_real
-    await db.commit()
-    await db.refresh(remito)
-    return remito
-
-
-async def confirm_remito(db: AsyncSession, remito_id: int) -> Remito:
-    """Atomic double-entry stock commitment and alias dictionary caching."""
-    remito = await _get_staged_remito(db, remito_id)
-    items = (
-        await db.scalars(select(RemitoItem).where(RemitoItem.remito_id == remito_id))
-    ).all()
-
-    for it in items:
-        if it.quantity_to_commit > 0 and not it.product_id:
-            raise InvalidMovementError(
-                f"Item '{it.raw_description}' is not linked to any product"
-            )
-
-    for it in items:
-        if it.quantity_to_commit <= 0 or not it.product_id:
-            continue
-
-        prod_q = select(Product).options(noload("*")).where(Product.id == it.product_id)
-        prod = (await db.scalars(prod_q.with_for_update())).one()
-        assert prod.id is not None
-        prod.current_stock += it.quantity_to_commit
-        prod.last_cost = it.calculated_unit_cost
-
-        remito_ref = remito.remito_number or remito.id
-        db.add(
-            InventoryLedger(
-                product_id=prod.id,
-                movement_type="receiving",
-                quantity_delta=it.quantity_to_commit,
-                balance_after=prod.current_stock,
-                reference_id=f"REMITO-{remito.id}",
-                notes=f"Remito {remito_ref}: {it.raw_description[:40]}",
-            )
-        )
-
-        await upsert_alias_mapping(
-            db,
-            remito.supplier_name,
-            it.raw_description,
-            prod.id,
-            it.multiplier,
-            it.package_type,
-            it.target_unit_type,
-        )
-
-    remito.status = RemitoStatus.COMMITTED
-    remito.committed_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(remito)
-    return remito
-
-
-async def reject_remito(db: AsyncSession, remito_id: int) -> Remito:
-    """Discard a staged remito."""
-    remito = await _get_staged_remito(db, remito_id)
-    remito.status = RemitoStatus.REJECTED
     await db.commit()
     await db.refresh(remito)
     return remito

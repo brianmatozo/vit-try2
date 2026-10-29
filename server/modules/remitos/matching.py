@@ -1,6 +1,4 @@
 import difflib
-import re
-import unicodedata
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,32 +11,19 @@ from server.modules.remitos.models import (
     SupplierProductMapping,
     TargetUnitType,
 )
-
-PACKAGING_NOISE = re.compile(
-    r"\b(?:x\s*\d+\s*(?:u(?:n(?:idades?)?)?\.?|gr?(?:s|amos?)?|kg|kilos?|lt?|ml|cc))"
-    r"|\b(?:caja|pack|bolsa|display|promo|oferta|sachet|sobre|unidad)\b"
-    r"|\b(?:de|el|la|los|las|por|con|sin)\b"
-    r"|[()[\]{}\-–—/\\|.,;:!?\"'`x×¡¿]",
-    re.IGNORECASE,
+from server.modules.remitos.text import (
+    normalize_supplier_text,
+    strip_packaging_noise,
 )
 
-
-def normalize_supplier_text(raw: str) -> str:
-    """Normalize supplier text for deterministic alias dictionary lookups."""
-    text = unicodedata.normalize("NFKD", raw)
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    noise = {"promo", "oferta", "liq", "liquidacion", "desc", "descuento", "nuevo"}
-    tokens = [t for t in text.split() if t not in noise]
-    return " ".join(tokens)
-
-
-def strip_packaging_noise(text: str) -> str:
-    """Remove packaging markers and noise words for catalog product comparison."""
-    cleaned = PACKAGING_NOISE.sub(" ", text)
-    return re.sub(r"\s+", " ", cleaned).strip().lower()
+__all__ = [
+    "match_supplier_item",
+    "normalize_supplier_text",
+    "strip_packaging_noise",
+    "tier1_exact_alias",
+    "tier2_fuzzy_match",
+    "upsert_alias_mapping",
+]
 
 
 async def tier1_exact_alias(
@@ -86,9 +71,7 @@ async def match_supplier_item(
     product_type: ProductType | None = None,
 ) -> tuple[int | None, int, MatchStrategy, int, str | None, TargetUnitType]:
     """Resolve raw item through Tier 1 dictionary and Tier 2 fuzzy matching."""
-    # 1. Tier 1: Alias Dictionary
-    alias = await tier1_exact_alias(db, supplier_name, raw_description)
-    if alias:
+    if alias := await tier1_exact_alias(db, supplier_name, raw_description):
         return (
             alias.product_id,
             100,
@@ -98,36 +81,20 @@ async def match_supplier_item(
             alias.target_unit_type,
         )
 
-    # 2. Extract packaging multiplier
     pkg = parse_packaging(raw_description, product_type=product_type)
-    target_type = (
-        TargetUnitType.BULK_GRAMS
-        if pkg.target_unit_type == "bulk_grams"
-        else TargetUnitType.DISCRETE_UNIT
-    )
+    is_bulk = pkg.target_unit_type == "bulk_grams"
+    target_type = TargetUnitType.BULK_GRAMS if is_bulk else TargetUnitType.DISCRETE_UNIT
 
-    # 3. Tier 2: Fuzzy Catalog Matching
     fuzzy_matches = await tier2_fuzzy_match(db, raw_description, limit=1)
+    res = (pkg.multiplier, pkg.package_type, target_type)
     if fuzzy_matches and fuzzy_matches[0][1] >= 65:
-        top_prod, confidence = fuzzy_matches[0]
         return (
-            top_prod.id,
-            confidence,
+            fuzzy_matches[0][0].id,
+            fuzzy_matches[0][1],
             MatchStrategy.FUZZY_CATALOG,
-            pkg.multiplier,
-            pkg.package_type,
-            target_type,
+            *res,
         )
-
-    # 4. Unmatched fallback
-    return (
-        None,
-        0,
-        MatchStrategy.UNMATCHED,
-        pkg.multiplier,
-        pkg.package_type,
-        target_type,
-    )
+    return (None, 0, MatchStrategy.UNMATCHED, *res)
 
 
 async def upsert_alias_mapping(
@@ -147,8 +114,7 @@ async def upsert_alias_mapping(
     )
     existing = (await db.scalars(stmt)).first()
     if existing:
-        existing.product_id = product_id
-        existing.multiplier = multiplier
+        existing.product_id, existing.multiplier = product_id, multiplier
         existing.package_type = package_type
         existing.target_unit_type = target_unit_type
         existing.times_used += 1
