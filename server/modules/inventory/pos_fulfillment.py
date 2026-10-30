@@ -10,8 +10,15 @@ from server.core.exceptions import (
     EntityNotFoundError,
     InsufficientStockError,
     InsufficientVirtualStockError,
+    RegisterClosedError,
 )
 from server.modules.catalog.models import Product
+from server.modules.closure.models import (
+    ClosureStatus,
+    FinancialClosure,
+    PaymentMethod,
+    POSTicket,
+)
 from server.modules.inventory.models import InventoryLedger, InventoryMovementType
 from server.modules.inventory.movements import get_locked_product
 from server.modules.inventory.schemas import (
@@ -72,8 +79,47 @@ async def fulfill_order(db: AsyncSession, req: StockFulfillRequest) -> Inventory
     return ledger_entry
 
 
+def _calculate_line_total(product: Product, quantity: int) -> int:
+    if product.product_type == "bulk":
+        ref = product.bulk_reference_grams or 100
+        return round((product.unit_price * quantity) / ref)
+    return product.unit_price * quantity
+
+
+def _update_closure_stats(
+    closure: FinancialClosure, method: PaymentMethod, amount: int
+) -> None:
+    attr_map = {
+        PaymentMethod.CASH: "cash_sales_amount",
+        PaymentMethod.CARD: "card_sales_amount",
+        PaymentMethod.QR: "qr_sales_amount",
+        PaymentMethod.DELIVERY: "delivery_sales_amount",
+    }
+    field = attr_map.get(method, "cash_sales_amount")
+    setattr(closure, field, getattr(closure, field) + amount)
+    closure.total_sales_amount += amount
+    closure.sales_count += 1
+    closure.expected_cash = (
+        closure.initial_cash
+        + closure.cash_sales_amount
+        + closure.cash_in_amount
+        - closure.cash_out_amount
+    )
+
+
 async def record_pos_sale(db: AsyncSession, req: POSSaleRequest) -> InventoryLedger:
     """Record immediate in-store POS checkout deduction (physical priority)."""
+    closure_stmt = (
+        select(FinancialClosure)
+        .where(FinancialClosure.status == ClosureStatus.OPEN)
+        .with_for_update()
+    )
+    active_closure = (await db.scalars(closure_stmt)).first()
+    if not active_closure:
+        raise RegisterClosedError(
+            "No hay una caja abierta. Debe abrir la caja para poder operar."
+        )
+
     product = await get_locked_product(db, req.product_id)
 
     if product.current_stock < req.quantity:
@@ -94,6 +140,23 @@ async def record_pos_sale(db: AsyncSession, req: POSSaleRequest) -> InventoryLed
         notes="In-store register sale",
     )
     db.add(ledger_entry)
+
+    final_total = (
+        req.total_amount
+        if req.total_amount is not None
+        else _calculate_line_total(product, req.quantity)
+    )
+
+    ticket = POSTicket(
+        ticket_id=req.ticket_reference_id,
+        closure_id=active_closure.id,  # type: ignore
+        payment_method=req.payment_method,
+        total_amount=final_total,
+        items_count=1,
+    )
+    db.add(ticket)
+    _update_closure_stats(active_closure, req.payment_method, final_total)
+
     await db.commit()
     await db.refresh(ledger_entry)
     return ledger_entry
@@ -102,15 +165,20 @@ async def record_pos_sale(db: AsyncSession, req: POSSaleRequest) -> InventoryLed
 async def record_pos_batch_sale(
     db: AsyncSession, req: POSBatchSaleRequest
 ) -> Sequence[InventoryLedger]:
-    """Atomic multi-item POS checkout deduction.
-
-    Locks all products in a single batch query (sorted deterministically
-    to prevent deadlocks), validates physical stock across all items, deducts
-    stock, and commits an atomic batch of inventory ledger movements in a
-    single transaction.
-    """
+    """Atomic multi-item POS checkout with deterministic product locks."""
     if not req.items:
         return []
+
+    closure_stmt = (
+        select(FinancialClosure)
+        .where(FinancialClosure.status == ClosureStatus.OPEN)
+        .with_for_update()
+    )
+    active_closure = (await db.scalars(closure_stmt)).first()
+    if not active_closure:
+        raise RegisterClosedError(
+            "No hay una caja abierta. Debe abrir la caja para poder operar."
+        )
 
     item_totals: dict[int, int] = {}
     for item in req.items:
@@ -140,9 +208,11 @@ async def record_pos_batch_sale(
             )
 
     ledger_entries: list[InventoryLedger] = []
+    computed_total = 0
     for pid, qty in item_totals.items():
         product = products_by_id[pid]
         product.current_stock -= qty
+        computed_total += _calculate_line_total(product, qty)
 
         entry = InventoryLedger(
             product_id=pid,
@@ -155,6 +225,20 @@ async def record_pos_batch_sale(
         ledger_entries.append(entry)
 
     db.add_all(ledger_entries)
+
+    final_total = req.total_amount if req.total_amount is not None else computed_total
+    ticket = POSTicket(
+        ticket_id=req.ticket_reference_id,
+        closure_id=active_closure.id,  # type: ignore
+        payment_method=req.payment_method,
+        total_amount=final_total,
+        cash_tendered=req.cash_tendered,
+        change_returned=req.change_returned,
+        items_count=len(req.items),
+    )
+    db.add(ticket)
+    _update_closure_stats(active_closure, req.payment_method, final_total)
+
     await db.commit()
     for entry in ledger_entries:
         await db.refresh(entry)

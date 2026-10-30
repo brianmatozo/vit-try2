@@ -107,6 +107,28 @@ class VisionGatewayError(VitalcerException):
         super().__init__(message, code=code)
 
 
+class RegisterClosedError(VitalcerException):
+    """Raised when a sale is attempted while cash register is closed (HTTP 409)."""
+
+    def __init__(
+        self,
+        message: str = "No hay una caja abierta. Debe abrir la caja para poder operar.",
+        code: str = "REGISTER_CLOSED",
+    ) -> None:
+        super().__init__(message, code=code)
+
+
+class ActiveClosureExistsError(VitalcerException):
+    """Raised when opening a session while another is active (maps to HTTP 409)."""
+
+    def __init__(
+        self,
+        message: str = "Ya existe una sesión de caja abierta.",
+        code: str = "ACTIVE_CLOSURE_EXISTS",
+    ) -> None:
+        super().__init__(message, code=code)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register global exception handlers preserving standard {'detail': str}
     along with additive machine-readable 'code'.
@@ -170,6 +192,24 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(RegisterClosedError)
+    async def register_closed_handler(
+        _: Request, exc: RegisterClosedError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": exc.message, "code": exc.code},
+        )
+
+    @app.exception_handler(ActiveClosureExistsError)
+    async def active_closure_exists_handler(
+        _: Request, exc: ActiveClosureExistsError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
             content={"detail": exc.message, "code": exc.code},
         )
 

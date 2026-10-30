@@ -6,6 +6,7 @@ from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
 from server.modules.catalog.models import ProductType
+from server.modules.closure.models import PaymentMethod
 from server.modules.inventory.models import InventoryMovementType
 
 
@@ -83,6 +84,12 @@ class POSSaleRequest(SQLModel):
     product_id: int
     quantity: int = Field(gt=0, description="Units or grams sold at register")
     ticket_reference_id: str = Field(description="POS ticket or transaction ID")
+    payment_method: PaymentMethod = Field(
+        default=PaymentMethod.CASH, description="Payment method used for sale"
+    )
+    total_amount: int | None = Field(
+        default=None, description="Total amount paid in whole ARS"
+    )
 
 
 class POSSaleItem(SQLModel):
@@ -98,6 +105,19 @@ class POSBatchSaleRequest(SQLModel):
     ticket_reference_id: str = Field(description="POS ticket or receipt ID")
     items: list[POSSaleItem] = Field(
         min_length=1, description="List of items sold in this checkout transaction"
+    )
+    payment_method: PaymentMethod = Field(
+        default=PaymentMethod.CASH, description="Payment method used for sale"
+    )
+    total_amount: int | None = Field(
+        default=None,
+        description="Total amount in ARS (computed from catalog if omitted)",
+    )
+    cash_tendered: int | None = Field(
+        default=None, description="Cash tendered by customer in ARS"
+    )
+    change_returned: int | None = Field(
+        default=None, description="Change returned to customer in ARS"
     )
 
 

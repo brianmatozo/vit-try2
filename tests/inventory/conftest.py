@@ -1,4 +1,11 @@
+import pytest
 from fastapi.testclient import TestClient
+
+
+@pytest.fixture(autouse=True)
+def open_register_session(client: TestClient) -> None:
+    """Ensure an open register session exists for inventory tests."""
+    client.post("/api/v1/closure/open", json={"initial_cash": 10000})
 
 
 def create_test_product(client: TestClient, **kwargs) -> int:

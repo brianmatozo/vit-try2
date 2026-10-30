@@ -128,6 +128,9 @@ class TestEndpointQueries:
             )
             p_ids.append(p_id)
 
+        # Open register session for strict POS mode before capturing queries
+        client.post("/api/v1/closure/open", json={"initial_cash": 10000})
+
         queries: list[str] = []
 
         def capture_sql(conn, cursor, statement, parameters, context, executemany):
