@@ -13,9 +13,15 @@ interface Props {
 	open: boolean;
 	oncomplete: () => void;
 	oncancel: () => void;
+	onRequestOpenRegister?: () => void;
 }
 
-let { open = $bindable(false), oncomplete, oncancel }: Props = $props();
+let {
+	open = $bindable(false),
+	oncomplete,
+	oncancel,
+	onRequestOpenRegister,
+}: Props = $props();
 
 const state = new CheckoutState();
 
@@ -94,7 +100,21 @@ async function handleConfirm() {
 			{/if}
 
 			<!-- Error Alert -->
-			{#if state.errorMessage}
+			{#if state.isRegisterClosed}
+				<div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-2 text-amber-900 text-xs">
+					<div class="flex items-center gap-2">
+						<AlertTriangle class="w-4 h-4 text-amber-600 shrink-0" />
+						<span class="font-semibold">La caja está cerrada.</span>
+					</div>
+					<button
+						type="button"
+						class="py-1 px-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+						onclick={() => onRequestOpenRegister?.()}
+					>
+						Abrir Caja
+					</button>
+				</div>
+			{:else if state.errorMessage}
 				<div class="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs font-semibold">
 					<AlertTriangle class="w-4 h-4 text-rose-600 shrink-0" />
 					<span>{state.errorMessage}</span>

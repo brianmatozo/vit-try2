@@ -150,7 +150,7 @@ describe('CheckoutState', () => {
 		expect(checkout.completedTicket?.change).toBe(2000);
 		expect(checkout.completedTicket?.itemCount).toBe(3);
 
-		// Verify API was called with discrete items using quantity and bulk using weightGrams
+		// Verify API was called with payment metadata and calculated change
 		expect(mockApi).toHaveBeenCalledWith({
 			body: {
 				ticket_reference_id: expect.stringMatching(/^POS-\d+/),
@@ -158,8 +158,36 @@ describe('CheckoutState', () => {
 					{ product_id: 1, quantity: 2 },
 					{ product_id: 2, quantity: 200 },
 				],
+				payment_method: 'cash',
+				total_amount: 8000,
+				cash_tendered: 10000,
+				change_returned: 2000,
 			},
 		});
+	});
+
+	it('detects REGISTER_CLOSED error code and flags isRegisterClosed', async () => {
+		checkout.setCashAmount(8000);
+		const onComplete = vi.fn();
+		const mockApi = vi.fn().mockResolvedValue({
+			error: {
+				detail: 'No hay una caja abierta.',
+				code: 'REGISTER_CLOSED',
+			},
+		}) as unknown as BatchSaleApiFn;
+
+		const success = await checkout.confirmSale(
+			mockCartItems,
+			8000,
+			3,
+			onComplete,
+			mockApi,
+		);
+
+		expect(success).toBe(false);
+		expect(checkout.isRegisterClosed).toBe(true);
+		expect(checkout.errorCode).toBe('REGISTER_CLOSED');
+		expect(checkout.errorMessage).toBe('No hay una caja abierta.');
 	});
 
 	it('handles API error response gracefully', async () => {

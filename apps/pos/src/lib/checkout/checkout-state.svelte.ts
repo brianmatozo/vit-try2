@@ -21,6 +21,8 @@ export class CheckoutState {
 	cashTendered = $state<number>(0);
 	isProcessing = $state<boolean>(false);
 	errorMessage = $state<string | null>(null);
+	errorCode = $state<string | null>(null);
+	isRegisterClosed = $state<boolean>(false);
 	completedTicket = $state<CompletedTicket | null>(null);
 
 	initCash(total: number): void {
@@ -52,6 +54,8 @@ export class CheckoutState {
 		this.cashTendered = initialAmount;
 		this.isProcessing = false;
 		this.errorMessage = null;
+		this.errorCode = null;
+		this.isRegisterClosed = false;
 		this.completedTicket = null;
 	}
 
@@ -73,6 +77,8 @@ export class CheckoutState {
 
 		this.isProcessing = true;
 		this.errorMessage = null;
+		this.errorCode = null;
+		this.isRegisterClosed = false;
 
 		const ticketId = `POS-${Date.now().toString().slice(-6)}`;
 		const itemsToProcess = [...items];
@@ -87,14 +93,26 @@ export class CheckoutState {
 				body: {
 					ticket_reference_id: ticketId,
 					items: payloadItems,
+					payment_method: this.paymentMethod,
+					total_amount: total,
+					cash_tendered:
+						this.paymentMethod === 'cash' ? this.cashTendered : undefined,
+					change_returned:
+						this.paymentMethod === 'cash'
+							? Math.max(0, this.getChange(total))
+							: undefined,
 				},
 			});
 
 			if (response.error) {
-				const { message } = extractApiError(
+				const { message, code } = extractApiError(
 					response.error,
 					'Error procesando la venta',
 				);
+				if (code === 'REGISTER_CLOSED') {
+					this.isRegisterClosed = true;
+					this.errorCode = 'REGISTER_CLOSED';
+				}
 				throw new Error(message);
 			}
 

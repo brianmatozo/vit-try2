@@ -1,6 +1,8 @@
 <script lang="ts">
 import { createQuery } from '@tanstack/svelte-query';
 import {
+	type ClosureSummaryResponse,
+	getActiveClosureOptions,
 	type ProductResponse,
 	productReadMultiApiV1ProductsGetOptions,
 } from '@vitalcer/api';
@@ -15,9 +17,25 @@ import CounterCamera from '$lib/counter/components/CounterCamera.svelte';
 import CounterFooter from '$lib/counter/components/CounterFooter.svelte';
 import CounterHeader from '$lib/counter/components/CounterHeader.svelte';
 import CounterNotification from '$lib/counter/components/CounterNotification.svelte';
+import QuickCashMovementModal from '$lib/counter/components/QuickCashMovementModal.svelte';
+import QuickOpenRegisterModal from '$lib/counter/components/QuickOpenRegisterModal.svelte';
+import RegisterStatusBar from '$lib/counter/components/RegisterStatusBar.svelte';
 import { CounterState } from '$lib/counter/counter-state.svelte';
 
 const counter = new CounterState();
+
+let isOpenRegisterModal = $state(false);
+let isCashMovementModal = $state(false);
+
+// Query active register session
+const activeClosureQuery = createQuery(() => ({
+	...getActiveClosureOptions(),
+	refetchInterval: 30000,
+}));
+
+const activeSummary = $derived<ClosureSummaryResponse | null>(
+	(activeClosureQuery.data as ClosureSummaryResponse | null) ?? null,
+);
 
 // Preload product catalog into TanStack Query memory cache for 0ms offline-tolerant scans
 const productsQuery = createQuery(() =>
@@ -33,6 +51,16 @@ const products = $derived<ProductResponse[]>(
 			? (productsQuery.data as ProductResponse[])
 			: [],
 );
+
+function handleOpenSuccess() {
+	activeClosureQuery.refetch();
+	counter.showNotification('Caja iniciada correctamente', 'success');
+}
+
+function handleMovementSuccess() {
+	activeClosureQuery.refetch();
+	counter.showNotification('Movimiento de caja registrado', 'success');
+}
 </script>
 
 <svelte:head>
@@ -49,6 +77,13 @@ const products = $derived<ProductResponse[]>(
 		hasItems={!cart.isEmpty}
 		onToggleCamera={() => counter.toggleCamera()}
 		onOpenClearConfirm={() => counter.openClearConfirm()}
+	/>
+
+	<RegisterStatusBar
+		summary={activeSummary}
+		isLoading={activeClosureQuery.isLoading}
+		onOpenRegister={() => (isOpenRegisterModal = true)}
+		onOpenCashMovement={() => (isCashMovementModal = true)}
 	/>
 
 	<CounterNotification notification={counter.notification} />
@@ -108,8 +143,12 @@ const products = $derived<ProductResponse[]>(
 	{#if counter.isCheckoutOpen}
 		<CheckoutModal
 			bind:open={counter.isCheckoutOpen}
-			oncomplete={() => counter.handleCheckoutSuccess()}
+			oncomplete={() => {
+				counter.handleCheckoutSuccess();
+				activeClosureQuery.refetch();
+			}}
 			oncancel={() => counter.closeCheckout()}
+			onRequestOpenRegister={() => (isOpenRegisterModal = true)}
 		/>
 	{/if}
 
@@ -118,4 +157,21 @@ const products = $derived<ProductResponse[]>(
 		onConfirm={() => counter.handleClearCart()}
 		onCancel={() => counter.closeClearConfirm()}
 	/>
+
+	{#if isOpenRegisterModal}
+		<QuickOpenRegisterModal
+			bind:open={isOpenRegisterModal}
+			onOpenSuccess={handleOpenSuccess}
+			onCancel={() => (isOpenRegisterModal = false)}
+		/>
+	{/if}
+
+	{#if isCashMovementModal && activeSummary}
+		<QuickCashMovementModal
+			bind:open={isCashMovementModal}
+			activeClosureId={activeSummary.closure.id}
+			onMovementSuccess={handleMovementSuccess}
+			onCancel={() => (isCashMovementModal = false)}
+		/>
+	{/if}
 </div>
