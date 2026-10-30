@@ -27,6 +27,7 @@ const navLinks = [
 	{ href: '/', label: 'Catálogo de Productos', shortLabel: 'Catálogo' },
 	{ href: '/remitos', label: 'Remitos & Stock Inbound', shortLabel: 'Remitos' },
 	{ href: '/sales', label: 'Ventas de Caja', shortLabel: 'Ventas' },
+	{ href: '/closure', label: 'Cierre de Caja', shortLabel: 'Cierre' },
 	{ href: '/ledger', label: 'Auditoría', shortLabel: 'Auditoría' },
 	{ href: '/actions', label: 'Acciones de Stock', shortLabel: 'Operaciones' },
 ];
