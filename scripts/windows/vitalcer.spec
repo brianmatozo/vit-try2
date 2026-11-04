@@ -1,11 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller specification for Vitalcer Control Panel & Backend.
+"""PyInstaller specification for Vitalcer Headless Launcher & Backend Server.
 
-Compiles vitalcer_control.py (Tkinter GUI supervisor + dual-mode FastAPI backend)
-into an optimized --onedir distribution for Inno Setup packaging.
+Compiles launcher.py into an optimized headless --onedir distribution (vitalcer.exe)
+for Inno Setup packaging. Zero console windows or Tkinter dependencies.
 """
 
-import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -46,7 +45,7 @@ hiddenimports = [
 ] + collect_submodules("server") + collect_submodules("scripts.windows")
 
 a = Analysis(
-    ["scripts/windows/vitalcer_control.py"],
+    ["scripts/windows/launcher.py"],
     pathex=[str(REPO_ROOT)],
     binaries=[],
     datas=[],
@@ -54,7 +53,15 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=["pytest", "ruff", "ty", "basedpyright"],
+    excludes=[
+        "pytest",
+        "ruff",
+        "ty",
+        "basedpyright",
+        "tkinter",
+        "_tkinter",
+        "tcl",
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     noarchive=False,
@@ -67,7 +74,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="vitalcer_control",
+    name="vitalcer",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -88,5 +95,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="vitalcer_control",
+    name="vitalcer",
 )

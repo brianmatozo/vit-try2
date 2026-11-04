@@ -124,18 +124,19 @@ try {
     Write-Warning "Hubo un error al ejecutar 'uv sync'. Verifica tu conexion o python."
 }
 
-# 5. Create Desktop Shortcut for Control Panel
+# 5. Create Desktop Shortcut for POS
 Write-Host "==> [Paso 5/5] Creando acceso directo en el Escritorio..." -ForegroundColor Cyan
 $DesktopPath = [System.Environment]::GetFolderPath("Desktop")
-$ShortcutPath = Join-Path $DesktopPath "Vitalcer Control Panel.lnk"
-$TargetBat = Join-Path $RepoRoot "scripts\windows\run_control.bat"
+$ShortcutPath = Join-Path $DesktopPath "Vitalcer POS.lnk"
+$TargetBat = Join-Path $RepoRoot "scripts\windows\run.bat"
 
 try {
     $WshShell = New-Object -ComObject WScript.Shell
     $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
     $Shortcut.TargetPath = $TargetBat
+    $Shortcut.Arguments = "--pos"
     $Shortcut.WorkingDirectory = $RepoRoot
-    $Shortcut.Description = "Panel de Control de Servicios de Vitalcer"
+    $Shortcut.Description = "Sistema Vitalcer POS de Mostrador"
     $Shortcut.Save()
     Write-Host "    • Acceso directo creado: $ShortcutPath ✅" -ForegroundColor Green
 } catch {
@@ -146,7 +147,7 @@ Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host "  Instalacion completada con exito!               " -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
-Write-Host "Ya puedes hacer doble click en el acceso directo de tu Escritorio"
-Write-Host "o ejecutar: scripts\windows\run_control.bat"
+Write-Host "Ya puedes hacer doble click en el acceso directo 'Vitalcer POS' de tu Escritorio"
+Write-Host "o compilar el instalador final para clientes con: scripts\windows\package.bat"
 Write-Host ""
 pause

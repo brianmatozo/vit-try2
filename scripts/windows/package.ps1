@@ -7,7 +7,7 @@ Set-Location $RepoRoot
 
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "   Compilador y Creador de Instalador de Vitalcer        " -ForegroundColor Green
-Write-Host "   (PyInstaller --onedir + Inno Setup lzma2)              " -ForegroundColor Green
+Write-Host "   (PyInstaller Headless + Inno Setup lzma2)              " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host ""
 
@@ -85,10 +85,14 @@ pnpm -r --filter "./apps/*" build
 node scripts/compress_static.mjs
 Write-Host "    • Frontends compilados y pre-comprimidos con Brotli/Gzip ✅" -ForegroundColor Green
 
-# 4. Compile Python Backend & GUI Supervisor with PyInstaller
-Write-Host "==> [Paso 4/5] Empaquetando backend y GUI con PyInstaller..." -ForegroundColor Cyan
+# 4. Compile Python Backend & Headless Launcher with PyInstaller
+Write-Host "==> [Paso 4/5] Empaquetando backend y launcher con PyInstaller..." -ForegroundColor Cyan
+$DistDir = Join-Path $RepoRoot "dist\vitalcer"
+if (Test-Path $DistDir) {
+    Remove-Item -Recurse -Force $DistDir -ErrorAction SilentlyContinue
+}
 uv run pyinstaller scripts/windows/vitalcer.spec --clean -y
-Write-Host "    • Binarios compilados en dist\vitalcer_control\ ✅" -ForegroundColor Green
+Write-Host "    • Binarios compilados en dist\vitalcer\ ✅" -ForegroundColor Green
 
 # 5. Compile Inno Setup Installer
 Write-Host "==> [Paso 5/5] Generando instalador final con Inno Setup..." -ForegroundColor Cyan

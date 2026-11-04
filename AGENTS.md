@@ -300,3 +300,4 @@ Before declaring any backend feature, endpoint, or refactor complete, the follow
 | Date | Tooling / Infrastructure Change | Notes & Rationale |
 | :--- | :--- | :--- |
 | **2026-10-29** | Added `pillow` (`>=13.0.0`) to `pyproject.toml` dependencies. | Required by Remito Ingestion Phase 7 image preprocessing pipeline: Pillow handles EXIF auto-rotation (`ImageOps.exif_transpose`), Lanczos downscaling to $\le 2048$px, WebP pre-compression, and corrupted image detection (`CorruptImageError` HTTP 400). |
+| **2026-11-04** | Replaced legacy Tkinter Python runner with headless Inno Setup installer (`vitalcer-setup-x64.exe`) and lightweight launcher (`launcher.py` / `vitalcer.exe`). | Eliminated the Python Tkinter GUI dashboard and console popups for non-technical retail users. Enabled zero-touch Windows Startup auto-launch, silent database initialization, and direct browser Desktop shortcuts (`Vitalcer POS` and `Vitalcer Admin`). |

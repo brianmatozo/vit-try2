@@ -10,9 +10,9 @@ Write-Host " Vitalcer Store Server (PowerShell Launcher)      " -ForegroundColor
 Write-Host "==================================================" -ForegroundColor Green
 
 if (Get-Command uv -ErrorAction SilentlyContinue) {
-    uv run python scripts/windows/service_manager.py --start-all
+    uv run python scripts/windows/launcher.py $args
 } elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    python scripts/windows/service_manager.py --start-all
+    python scripts/windows/launcher.py $args
 } else {
     Write-Error "No se encontro uv ni python instalado en el sistema."
 }

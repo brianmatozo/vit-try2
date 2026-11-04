@@ -10,13 +10,13 @@ echo ====================================================
 
 where uv >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-    uv run python scripts\windows\service_manager.py --start-all
+    uv run python scripts\windows\launcher.py %*
     exit /b %ERRORLEVEL%
 )
 
 where python >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-    python scripts\windows\service_manager.py --start-all
+    python scripts\windows\launcher.py %*
     exit /b %ERRORLEVEL%
 )
 
