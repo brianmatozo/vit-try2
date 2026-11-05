@@ -28,7 +28,9 @@ PrivilegesRequired=admin
 WizardStyle=modern
 DisableWelcomePage=no
 DisableProgramGroupPage=yes
+UninstallDisplayName=Vitalcer (Sistema de Gestión y POS)
 UninstallDisplayIcon={app}\{#MyAppExeName}
+CreateUninstallRegKey=yes
 
 [Languages]
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
@@ -54,6 +56,9 @@ Source: "..\..\tools\pgsql\*"; DestDir: "{app}\tools\pgsql"; Flags: ignoreversio
 Source: "..\..\apps\admin\build\*"; DestDir: "{app}\apps\admin\build"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\..\apps\pos\build\*"; DestDir: "{app}\apps\pos\build"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; 5. Packaged uninstaller launcher script
+Source: "uninstall_packaged.bat"; DestDir: "{app}"; DestName: "Desinstalar.bat"; Flags: ignoreversion
+
 [Dirs]
 Name: "{app}\data\postgres"; Permissions: users-full
 Name: "{app}\data\logs"; Permissions: users-full
@@ -68,6 +73,7 @@ Name: "{group}\Vitalcer POS (Caja)"; Filename: "{app}\{#MyAppExeName}"; Paramete
 Name: "{group}\Vitalcer Admin"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--admin"; WorkingDir: "{app}"
 Name: "{group}\Detener Servicios Vitalcer"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--stop"; WorkingDir: "{app}"
 Name: "{group}\Desinstalar Vitalcer"; Filename: "{uninstallexe}"
+Name: "{app}\Desinstalar Vitalcer"; Filename: "{uninstallexe}"; WorkingDir: "{app}"
 
 [Run]
 ; Database cluster initialization (only on clean install)
@@ -85,7 +91,15 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--pos"; Description: "Abrir Vita
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--stop"; Flags: runhidden; RunOnceId: "StopServices"
 Filename: "{app}\tools\pgsql\bin\pg_ctl.exe"; Parameters: "-D ""{app}\data\postgres"" -m fast stop"; Flags: runhidden; RunOnceId: "StopPostgres"
 Filename: "taskkill.exe"; Parameters: "/F /IM caddy.exe"; Flags: runhidden; RunOnceId: "KillCaddy"
+Filename: "taskkill.exe"; Parameters: "/F /IM postgres.exe"; Flags: runhidden; RunOnceId: "KillPostgres"
 Filename: "taskkill.exe"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillVitalcer"
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\data"
+Type: filesandordirs; Name: "{app}\tools"
+Type: files; Name: "{app}\*.log"
+Type: files; Name: "{app}\*.pid"
+Type: files; Name: "{app}\Desinstalar.bat"
 
 [Code]
 function NeedsDbInit(): Boolean;
@@ -95,14 +109,17 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usUninstall then
+  if CurUninstallStep = usPostUninstall then
   begin
-    if DirExists(ExpandConstant('{app}\data\postgres')) then
-    begin
-      if MsgBox('¿Deseas conservar la base de datos y el catálogo de productos existente en data\postgres?', mbConfirmation, MB_YESNO) = IDNO then
-      begin
-        DelTree(ExpandConstant('{app}\data'), True, True, True);
-      end;
-    end;
+    // Remove desktop shortcuts
+    DeleteFile(ExpandConstant('{autodesktop}\Vitalcer POS.lnk'));
+    DeleteFile(ExpandConstant('{autodesktop}\Vitalcer Admin.lnk'));
+
+    // Remove Windows Startup auto-launch registry keys
+    RegDeleteValue(HKLM, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Vitalcer');
+    RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Vitalcer');
+
+    // Clean wipe entire application folder
+    DelTree(ExpandConstant('{app}'), True, True, True);
   end;
 end;

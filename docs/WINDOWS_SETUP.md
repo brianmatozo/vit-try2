@@ -77,15 +77,39 @@ Para que los cajeros o empleados utilicen sus teléfonos como lectores inalámbr
 4. ¡Listo! El navegador activará la cámara para escanear etiquetas GS1 de balanza y códigos EAN-13.
 
 ### Detener Servicios o Desinstalar
+
+#### Detener Servicios
 - Desde el menú Inicio: carpeta **Vitalcer** -> **"Detener Servicios Vitalcer"**.
-- Al desinstalar, el desinstalador detiene los procesos y pregunta si se desea **conservar la base de datos y ventas históricas** en `data\postgres` para futuras actualizaciones.
+
+#### Desinstalación Completa (Packaged Uninstaller)
+El sistema incluye múltiples puntos de acceso para desinstalar de forma limpia:
+1. **Configuración de Windows**: Ir a *Configuración > Aplicaciones > Aplicaciones Instaladas*, buscar **Vitalcer** y hacer clic en *Desinstalar*.
+2. **Menú Inicio**: Carpeta *Vitalcer* -> **"Desinstalar Vitalcer"**.
+3. **Carpeta de Instalación (`C:\Vitalcer`)**:
+   - Acceso directo **"Desinstalar Vitalcer"**.
+   - Script ejecutable **`Desinstalar.bat`**.
+
+El desinstalador se encarga de:
+- Detener ordenadamente PostgreSQL, FastAPI y Caddy.
+- Forzar el cierre de procesos residuales para liberar bloqueos de archivos.
+- Eliminar los accesos directos del Escritorio (**Vitalcer POS** y **Vitalcer Admin**).
+- Limpiar el registro de inicio automático de Windows (`HKLM` / `HKCU`).
+- Realizar un **borrado completo y limpio** de toda la carpeta `C:\Vitalcer` (incluyendo base de datos `data\postgres` y logs `data\logs`), dejando el equipo sin archivos huérfanos.
 
 ---
 
-## 5. Instalación Local para Desarrolladores
+## 5. Instalación y Desinstalación Local para Desarrolladores
 
+### Instalación desde el código fuente
 Si trabajás directamente sobre el código fuente en Windows:
 ```cmd
 scripts\windows\install.bat
 ```
 Este script descarga las herramientas portables, sincroniza las dependencias con `uv sync` y crea el acceso directo en el Escritorio apuntando a `scripts\windows\launcher.py`.
+
+### Desinstalación y Limpieza en Desarrollo
+Para limpiar el entorno de desarrollo y remover los accesos directos creados:
+```cmd
+scripts\windows\uninstall.bat
+```
+El asistente detendrá los procesos locales, removerá los accesos directos del Escritorio y consultará si deseás eliminar la carpeta local `data/`.
